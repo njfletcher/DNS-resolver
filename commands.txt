@@ -1,0 +1,4 @@
+g++ -c main.cpp ... compile files
+g++ main.o ... -o resolver link files
+
+or g++ main.cpp ...
