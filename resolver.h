@@ -5,7 +5,7 @@
 #pragma once
 
 
-std::list<std::pair<std::string*,std::string*>*>* readSafetyFile(std::string filePath);
+std::list<std::pair<std::string,std::string>>* readSafetyFile(std::string filePath);
 
 
 

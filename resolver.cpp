@@ -9,12 +9,12 @@
 using namespace std;
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
-list<pair<string*,string*>*>* readSafetyFile(string filePath){
+list<pair<string,string>>* readSafetyFile(string filePath){
 
 	string currLine;
 	size_t delimPos;
 	unsigned int numServers = 0;
-	list<pair<string*,string*>*>* lPtr = new list<pair<string*,string*>*>();
+	list<pair<string,string>>* lPtr = new list<pair<string,string>>();
 	
 	ifstream inp(filePath);
 	
@@ -30,9 +30,9 @@ list<pair<string*,string*>*>* readSafetyFile(string filePath){
 		}
 		else{
 			
-			string* ipAddress = new string(currLine.substr(0,delimPos));
-			string* domainName = new string(currLine.substr(delimPos+1));
-			pair<string*,string*>* pr = new pair<string*,string*>(ipAddress, domainName);
+			string ipAddress = currLine.substr(0,delimPos);
+			string domainName = currLine.substr(delimPos+1);
+			pair<string,string> pr(ipAddress, domainName);
 			lPtr->push_back(pr);
 		
 		}
