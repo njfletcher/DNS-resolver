@@ -1,35 +1,47 @@
 
-struct DNSFlags{
+class DNSFlags{
 
-	unsigned char qr;
-	unsigned char opcode;
-	unsigned char aa;
-	unsigned char tc;
-	unsigned char rd;
-	unsigned char ra;
-	unsigned char z;
-	unsigned char rcode;
+	public:
+	
+		unsigned char qr;
+		unsigned char opcode;
+		unsigned char aa;
+		unsigned char tc;
+		unsigned char rd;
+		unsigned char ra;
+		unsigned char z;
+		unsigned char rcode;
+		
+		char* toBuffer(char * buffer);
 	
 
 };
 
-struct DNSHeader {
+class DNSHeader {
 
-	unsigned short transId;
-	DNSFlags* flags;
-	unsigned short numQuestions;
-	unsigned short numAnswers;
-	unsigned short numAuthRR;
-	unsigned short numAdditRR;
+	public:
+	
+		unsigned short transId;
+		DNSFlags* flags;
+		unsigned short numQuestions;
+		unsigned short numAnswers;
+		unsigned short numAuthRR;
+		unsigned short numAdditRR;
+		
+		char* toBuffer(char* buffer);
 
 
 };
 
-struct QuestionRecord{
+class QuestionRecord{
 
-	char* name;
-	unsigned short qType;
-	unsigned short qClass;
+	public:
+		char* name;
+		unsigned short qType;
+		unsigned short qClass;
+		
+		char* toBuffer(char* buffer);
+		
 
 };
 
@@ -46,11 +58,14 @@ struct ResourceRecord{
 
 struct DNSMessage{
 
-	DNSHeader* hdr;
-	QuestionRecord* question// one or more questions for the name server to answer
-	ResourceRecord* answer // zero or more resource records that answer the query
-	ResourceRecord* authority//zero or more resource records that point to authoritative name servers
-	ResourceRecord* additional // zero or more resource records that are strictly not answers
+	public:
+		DNSHeader* hdr;
+		QuestionRecord* question// one or more questions for the name server to answer
+		ResourceRecord* answer // zero or more resource records that answer the query
+		ResourceRecord* authority//zero or more resource records that point to authoritative name servers
+		ResourceRecord* additional // zero or more resource records that are strictly not answers
+		
+		char* toBuffer(char* buffer);
 
 };
 
