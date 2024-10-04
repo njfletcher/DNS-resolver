@@ -1,3 +1,5 @@
+#include <vector>
+
 
 class DNSFlags{
 
@@ -12,7 +14,7 @@ class DNSFlags{
 		unsigned char z;
 		unsigned char rcode;
 		
-		char* toBuffer(char * buffer);
+		void toBuffer(std::vector<char> & buffer);
 	
 
 };
@@ -28,7 +30,7 @@ class DNSHeader {
 		unsigned short numAuthRR;
 		unsigned short numAdditRR;
 		
-		char* toBuffer(char* buffer);
+		void toBuffer(std::vector<char> & buffer);
 
 
 };
@@ -36,23 +38,27 @@ class DNSHeader {
 class QuestionRecord{
 
 	public:
-		char* name;
+		char* name; // c style string
 		unsigned short qType;
 		unsigned short qClass;
 		
-		char* toBuffer(char* buffer);
+		void toBuffer(std::vector<char> & buffer);
 		
 
 };
 
 struct ResourceRecord{
 
-	char* name;
-	unsigned short rType;
-	unsigned short rClass;
-	unsigned int ttl;
-	unsigned short rdLength; //specified in octets
-	unsigned short rdData;
+	public:
+		char* name; // c style string
+		unsigned short rType;
+		unsigned short rClass;
+		unsigned int ttl;
+		unsigned short rdLength; //specified in octets
+		char* rData; //length of rdLength, not null terminated
+		
+		void toBuffer(std::vector<char> & buffer);
+	
 
 };
 
@@ -60,12 +66,12 @@ struct DNSMessage{
 
 	public:
 		DNSHeader* hdr;
-		QuestionRecord* question// one or more questions for the name server to answer
-		ResourceRecord* answer // zero or more resource records that answer the query
-		ResourceRecord* authority//zero or more resource records that point to authoritative name servers
-		ResourceRecord* additional // zero or more resource records that are strictly not answers
+		QuestionRecord* question;// one or more questions for the name server to answer
+		ResourceRecord* answer; // zero or more resource records that answer the query
+		ResourceRecord* authority;//zero or more resource records that point to authoritative name servers
+		ResourceRecord* additional; // zero or more resource records that are strictly not answers
 		
-		char* toBuffer(char* buffer);
+		void toBuffer(std::vector<char> & buffer);
 
 };
 
