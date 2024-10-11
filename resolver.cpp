@@ -5,16 +5,18 @@
 #include <utility>
 #include <list>
 #include <ostream>
-
+#include <memory>
+#include "structures.h"
+#include <vector>
 using namespace std;
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
-list<pair<string,string>>* readSafetyFile(string filePath){
+shared_ptr< list<pair<string,string>> > readSafetyFile(string filePath){
 
 	string currLine;
 	size_t delimPos;
 	unsigned int numServers = 0;
-	list<pair<string,string>>* lPtr = new list<pair<string,string>>();
+	shared_ptr< list<pair<string,string>> > lPtr = make_shared< list<pair<string,string>> >();
 	
 	ifstream inp(filePath);
 	
@@ -50,4 +52,20 @@ list<pair<string,string>>* readSafetyFile(string filePath){
 	}
 
 
+}
+
+
+void sendTestQuery(){
+
+	DNSFlags flg(qrVals::query, opcodes::standard, 0, 0, 0, 0, 0, 0);
+	DNSHeader hdr(1, &flg, 1, 0, 0,0);
+	string s = "google.com";
+	QuestionRecord q(s.c_str(), ResourceTypes::a, ResourceClasses::in);
+	DNSMessage msg(&hdr, &q, NULL, NULL, NULL );
+	vector<char> v;
+	msg.toBuffer(v);
+	for(auto iter = v.begin(); iter != v.end(); iter++){
+		cout << (unsigned int)*iter << " " << endl;
+	}
+	
 }

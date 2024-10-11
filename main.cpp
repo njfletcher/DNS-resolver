@@ -5,6 +5,7 @@
 #include <ostream>
 #include <iostream>
 #include "network.h"
+#include <memory>
 
 using namespace std;
 
@@ -17,9 +18,9 @@ int main(int argc, char** argv){
 	}
 
 	string fileP(argv[1]);
-	list<pair<string,string>>* sPtr = readSafetyFile(fileP);
+	shared_ptr< list<pair<string,string>> > sPtr = readSafetyFile(fileP);
 	
-	if(sPtr == NULL){
+	/*if(sPtr == NULL){
 		cout << "invalid list" << endl;
 		return -1;
 	
@@ -35,6 +36,8 @@ int main(int argc, char** argv){
 		}
 	
 	}
+	*/
+	sendTestQuery();
 	
 	return 0;
 
