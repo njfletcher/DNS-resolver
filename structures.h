@@ -1,4 +1,7 @@
+
+#pragma once
 #include <vector>
+#include <cstdint>
 
 
 enum class qrVals{
@@ -22,15 +25,15 @@ class DNSFlags{
 	
 		qrVals _qr;
 		opcodes _opcode;
-		unsigned char _aa;
-		unsigned char _tc;
-		unsigned char _rd;
-		unsigned char _ra;
-		unsigned char _z;
-		unsigned char _rcode;
+		uint8_t _aa;
+		uint8_t _tc;
+		uint8_t _rd;
+		uint8_t _ra;
+		uint8_t _z;
+		uint8_t _rcode;
 		
-		DNSFlags(qrVals qr, opcodes opcode, unsigned char aa, unsigned char tc, unsigned char rd, unsigned char ra, unsigned char z, unsigned char rcode);
-		void toBuffer(std::vector<char> & buffer);
+		DNSFlags(qrVals qr, opcodes opcode, uint8_t aa, uint8_t tc, uint8_t rd, uint8_t ra, uint8_t z, uint8_t rcode);
+		void toBuffer(std::vector<uint8_t> & buffer);
 	
 
 };
@@ -39,15 +42,15 @@ class DNSHeader {
 
 	public:
 	
-		unsigned short _transId;
+		uint16_t _transId;
 		DNSFlags* _flags;
-		unsigned short _numQuestions;
-		unsigned short _numAnswers;
-		unsigned short _numAuthRR;
-		unsigned short _numAdditRR;
+		uint16_t _numQuestions;
+		uint16_t _numAnswers;
+		uint16_t _numAuthRR;
+		uint16_t _numAdditRR;
 		
-		DNSHeader(unsigned short transId, DNSFlags* flags, unsigned short numQuestions, unsigned short numAnswers, unsigned short numAuthRR, unsigned short numAdditRR);
-		void toBuffer(std::vector<char> & buffer);
+		DNSHeader(uint16_t transId, DNSFlags* flags, uint16_t numQuestions, uint16_t numAnswers, uint16_t numAuthRR, uint16_t numAdditRR);
+		void toBuffer(std::vector<uint8_t> & buffer);
 
 
 };
@@ -93,7 +96,7 @@ class QuestionRecord{
 		ResourceClasses _qClass;
 		
 		QuestionRecord(const char * name, ResourceTypes qType, ResourceClasses qClass);
-		void toBuffer(std::vector<char> & buffer);
+		void toBuffer(std::vector<uint8_t> & buffer);
 		
 
 };
@@ -102,13 +105,13 @@ struct ResourceRecord{
 
 	public:
 		char* name; // c style string
-		unsigned short rType;
-		unsigned short rClass;
-		unsigned int ttl;
-		unsigned short rdLength; //specified in octets
+		uint16_t rType;
+		uint16_t rClass;
+		uint32_t ttl;
+		uint16_t rdLength; //specified in octets
 		char* rData; //length of rdLength, not null terminated
 		
-		void toBuffer(std::vector<char> & buffer);
+		void toBuffer(std::vector<uint8_t> & buffer);
 	
 
 };
@@ -123,7 +126,7 @@ struct DNSMessage{
 		ResourceRecord* _additional; // zero or more resource records that are strictly not answers
 		
 		DNSMessage(DNSHeader* hdr, QuestionRecord* question, ResourceRecord* answer, ResourceRecord* authority, ResourceRecord* additional);
-		void toBuffer(std::vector<char> & buffer);
+		void toBuffer(std::vector<uint8_t> & buffer);
 
 };
 

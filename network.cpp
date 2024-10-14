@@ -7,10 +7,12 @@
 #include <string>
 #include "network.h"
 #include <cstdio>
+#include <vector>
+#include <cstdint>
 
 using namespace std;
 
-int sendMessageResolverClient(string serverIp){
+int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg){
 
 	const char * ipStr = serverIp.c_str();
 	uint16_t serverPort = 53;
@@ -31,26 +33,37 @@ int sendMessageResolverClient(string serverIp){
 	
 	}
 
-	const char* message = "Hello, server!";
-	send(clientSocket, message, strlen(message), 0);
+	if(msg.empty()){
+		cout << "need a message to send" << endl;
+		return -1;
+	}
+	
+	const uint8_t* msgArr = &msg[0];
+	cout << "MY MESSAGE START=============================================" << endl;
+	for(int i =0; i < msg.size(); i++){
+		cout << (int)msgArr[i] << " ";
+	}
+	cout << endl;
+	cout << "MY MESSAGE END=============================================" << endl;
+	send(clientSocket, msgArr, msg.size(), 0);
 	
 	
 	char buffer[2000] = {0};
-	int bytes  = read(clientSocket,&buffer,sizeof(buffer) -1);
+	int bytes  = recv(clientSocket,&buffer,2000, 0);
 	cout << bytes << endl;
 	if(bytes < 0){
 	
 		perror("read from server");
 	}
-	
-	cout << "MESSAGE START=============================================" << endl;
+	cout <<endl;
+	cout << "SERVER MESSAGE START=============================================" << endl;
 	
 	for(int i =0; i < 2000; i++){
 		cout << (int)buffer[i] << " ";
 	
 	}
 	
-	cout << "MESSAGE END=============================================" << endl;
+	cout << "SERVER MESSAGE END=============================================" << endl;
 	//cout << buffer << endl;
 	
 	
