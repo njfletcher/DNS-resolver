@@ -65,7 +65,7 @@ void sendTestQuery(){
 	DNSMessage msg(&hdr, &q, NULL, NULL, NULL );
 	vector<uint8_t> v;
 	msg.toBuffer(v);
-	sendMessageResolverClient(string("192.58.128.30"), v);
+	sendMessageResolverClient(string("128.252.0.100"), v);
 	
 	
 }

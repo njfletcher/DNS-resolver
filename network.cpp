@@ -17,22 +17,25 @@ int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg){
 	const char * ipStr = serverIp.c_str();
 	uint16_t serverPort = 53;
 	
-	int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-
-  
-	struct sockaddr_in remoteaddr;
-	remoteaddr.sin_family = AF_INET;
-	remoteaddr.sin_addr.s_addr = inet_addr(ipStr);
-	remoteaddr.sin_port = htons(serverPort);
+	int clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	
-	if(connect(clientSocket, (struct sockaddr *)&remoteaddr, sizeof(remoteaddr)) < 0){
-	
-		cout << "Cannot connect to server" << endl;
-		close(clientSocket);
+	if(clientSocket < 0){
+		perror("cant create socket\n");
 		return -1;
 	
 	}
 
+	struct sockaddr_in serverAddr;
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_port = htons(serverPort);
+	int success = inet_aton(ipStr, &(serverAddr.sin_addr));
+	if(success == 0){
+		cout << "invalid ip conversion" << endl;
+		return -1;
+	}
+	
+	cout << "sending to server" << inet_ntoa(serverAddr.sin_addr) << endl;
+	
 	if(msg.empty()){
 		cout << "need a message to send" << endl;
 		return -1;
@@ -45,25 +48,38 @@ int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg){
 	}
 	cout << endl;
 	cout << "MY MESSAGE END=============================================" << endl;
-	send(clientSocket, msgArr, msg.size(), 0);
 	
+	int bytesSent = sendto(clientSocket, msgArr, msg.size(), MSG_CONFIRM, (struct sockaddr *) &serverAddr, sizeof(serverAddr)); 
+	
+	cout << "sent bytes " << bytesSent << endl;
+	if(bytesSent < 0){
+		perror("cant send message\n");
+		return -1;
+	
+	}
 	
 	char buffer[2000] = {0};
-	int bytes  = recv(clientSocket,&buffer,2000, 0);
-	cout << bytes << endl;
-	if(bytes < 0){
 	
+	socklen_t outSize;
+	int bytesRec = recvfrom(clientSocket, buffer, 2000, 0, (struct sockaddr *) &serverAddr, &outSize); 
+	
+	cout << bytesRec << endl;
+	if(bytesRec < 0){
 		perror("read from server");
+		return -1;
 	}
 	cout <<endl;
 	cout << "SERVER MESSAGE START=============================================" << endl;
-	
 	for(int i =0; i < 2000; i++){
 		cout << (int)buffer[i] << " ";
 	
 	}
-	
 	cout << "SERVER MESSAGE END=============================================" << endl;
+	
+	
+	
+	
+	
 	//cout << buffer << endl;
 	
 	

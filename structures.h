@@ -2,6 +2,7 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+#include <string>
 
 
 enum class qrVals{
@@ -91,10 +92,11 @@ enum class ResourceClasses{
 class QuestionRecord{
 
 	public:
-		const char* _name; // c style string
+		std::vector<uint8_t> _name; // a sequence of octets that repeats the pattern: length octet = n, n octets 
 		ResourceTypes _qType;
 		ResourceClasses _qClass;
 		
+		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
 		QuestionRecord(const char * name, ResourceTypes qType, ResourceClasses qClass);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		

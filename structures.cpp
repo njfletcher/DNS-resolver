@@ -1,6 +1,7 @@
 #include "structures.h"
 #include <vector>
 #include <cstdint>
+#include <iostream>
 
 using namespace std;
 
@@ -32,26 +33,62 @@ DNSHeader::DNSHeader(uint16_t transId, DNSFlags* flags, uint16_t numQuestions, u
 
 void DNSHeader::toBuffer(vector<uint8_t> & buffer){
 
-	buffer.push_back(_transId & 0x00ff);
 	buffer.push_back((_transId & 0xff00) >> 8);
-
+	buffer.push_back(_transId & 0x00ff);
+	
 	_flags->toBuffer(buffer);
 	
-	buffer.push_back(_numQuestions & 0x00ff);
 	buffer.push_back((_numQuestions & 0xff00) >> 8);
+	buffer.push_back(_numQuestions & 0x00ff);
 	
-	buffer.push_back(_numAnswers & 0x00ff);
 	buffer.push_back((_numAnswers & 0xff00) >> 8);
+	buffer.push_back(_numAnswers & 0x00ff);
 	
-	buffer.push_back(_numAuthRR & 0x00ff);
 	buffer.push_back((_numAuthRR & 0xff00) >> 8);
+	buffer.push_back(_numAuthRR & 0x00ff);
 	
-	buffer.push_back(_numAdditRR & 0x00ff);
 	buffer.push_back((_numAdditRR & 0xff00) >> 8);
+	buffer.push_back(_numAdditRR & 0x00ff);
 	
 }
 
-QuestionRecord::QuestionRecord(const char * name, ResourceTypes qType, ResourceClasses qClass): _name(name), _qType(qType), _qClass(qClass) {};
+
+void convertCStringToOctetForm(const char * name, vector<uint8_t>& buffer){
+	
+	string s(name);
+	bool labelsLeft = true;
+	string label;
+	uint8_t labelLen;
+	
+	while(labelsLeft){
+		
+		size_t ind = s.find(".");
+		if(ind == string::npos){
+			labelsLeft = false;
+			label = s;
+			labelLen = s.length();
+		}
+		else{
+			label = s.substr(0, ind);
+			labelLen = label.length();
+			s = s.substr(ind + 1);
+		
+		}
+		
+		buffer.push_back(labelLen);
+		for(uint8_t i = 0; i < labelLen; i++){
+			buffer.push_back(label[i]);
+		}
+		
+	}
+
+
+}
+
+QuestionRecord::QuestionRecord(const char * name, ResourceTypes qType, ResourceClasses qClass): _qType(qType), _qClass(qClass) {
+
+	convertCStringToOctetForm(name, _name);
+};
 
 void QuestionRecord::toBuffer(vector<uint8_t> & buffer){
 
@@ -62,11 +99,11 @@ void QuestionRecord::toBuffer(vector<uint8_t> & buffer){
 	//include the null term
 	buffer.push_back(0);
 	
-	buffer.push_back((uint8_t)_qType & 0x00ff);
 	buffer.push_back(((uint8_t)_qType & 0xff00) >> 8);
+	buffer.push_back((uint8_t)_qType & 0x00ff);
 
-	buffer.push_back((uint8_t)_qClass & 0x00ff);
 	buffer.push_back(((uint8_t)_qClass & 0xff00) >> 8);
+	buffer.push_back((uint8_t)_qClass & 0x00ff);
 		
 }
 
@@ -76,22 +113,23 @@ void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 		
 		buffer.push_back(name[i]);
 	}
+	
 	//include the null term
 	buffer.push_back(0);
 	
-	buffer.push_back(rType & 0x00ff);
 	buffer.push_back((rType & 0xff00) >> 8);
+	buffer.push_back(rType & 0x00ff);
 
-	buffer.push_back(rClass & 0x00ff);
 	buffer.push_back((rClass & 0xff00) >> 8);
+	buffer.push_back(rClass & 0x00ff);
 	
-	buffer.push_back(ttl & 0x000000ff);
-	buffer.push_back((ttl & 0x0000ff00) >> 8);
-	buffer.push_back((ttl & 0x00ff0000) >> 16);
 	buffer.push_back((ttl & 0xff000000) >> 24);
+	buffer.push_back((ttl & 0x00ff0000) >> 16);
+	buffer.push_back((ttl & 0x0000ff00) >> 8);
+	buffer.push_back(ttl & 0x000000ff);
 	
-	buffer.push_back(rdLength & 0x00ff);
 	buffer.push_back((rdLength & 0xff00) >> 8);
+	buffer.push_back(rdLength & 0x00ff);
 
 	for(uint16_t i = 0; i < rdLength; i++){
 		
