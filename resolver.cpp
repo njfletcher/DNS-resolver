@@ -64,8 +64,10 @@ void sendTestQuery(){
 	QuestionRecord q(s.c_str(), ResourceTypes::a, ResourceClasses::in);
 	DNSMessage msg(&hdr, &q, NULL, NULL, NULL );
 	vector<uint8_t> v;
+	vector<uint8_t> resp;
 	msg.toBuffer(v);
-	sendMessageResolverClient(string("128.252.0.100"), v);
+	sendMessageResolverClient(string("128.252.0.100"), v, resp);
+	DNSMessage res(resp);
 	
 	
 }

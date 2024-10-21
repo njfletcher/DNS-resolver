@@ -9,10 +9,13 @@
 #include <cstdio>
 #include <vector>
 #include <cstdint>
+#include <algorithm>
 
 using namespace std;
 
-int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg){
+#define responseSize 2000
+
+void sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg, vector<uint8_t>& resp){
 
 	const char * ipStr = serverIp.c_str();
 	uint16_t serverPort = 53;
@@ -44,7 +47,7 @@ int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg){
 	const uint8_t* msgArr = &msg[0];
 	cout << "MY MESSAGE START=============================================" << endl;
 	for(int i =0; i < msg.size(); i++){
-		cout << (int)msgArr[i] << " ";
+		cout << (unsigned int)msgArr[i] << " ";
 	}
 	cout << endl;
 	cout << "MY MESSAGE END=============================================" << endl;
@@ -58,10 +61,10 @@ int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg){
 	
 	}
 	
-	char buffer[2000] = {0};
+	uint8_t buffer[responseSize] = {0};
 	
 	socklen_t outSize;
-	int bytesRec = recvfrom(clientSocket, buffer, 2000, 0, (struct sockaddr *) &serverAddr, &outSize); 
+	int bytesRec = recvfrom(clientSocket, buffer, responseSize, 0, (struct sockaddr *) &serverAddr, &outSize); 
 	
 	cout << bytesRec << endl;
 	if(bytesRec < 0){
@@ -71,19 +74,14 @@ int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg){
 	cout <<endl;
 	cout << "SERVER MESSAGE START=============================================" << endl;
 	for(int i =0; i < 2000; i++){
-		cout << (int)buffer[i] << " ";
+		cout << (unsigned int)buffer[i] << " ";
 	
 	}
 	cout << "SERVER MESSAGE END=============================================" << endl;
 	
-	
-	
-	
-	
-	//cout << buffer << endl;
-	
-	
 	close(clientSocket);
+	resp(buffer,buffer + (responseSize * sizeof(uint8_t));
+	
 	return 0;
 
 }

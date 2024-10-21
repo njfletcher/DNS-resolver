@@ -3,7 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include <string>
-
+#include <iterator>
 
 enum class qrVals{
 	query = 0,
@@ -34,9 +34,9 @@ class DNSFlags{
 		uint8_t _rcode;
 		
 		DNSFlags(qrVals qr, opcodes opcode, uint8_t aa, uint8_t tc, uint8_t rd, uint8_t ra, uint8_t z, uint8_t rcode);
+		DNSFlags(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator end);
 		void toBuffer(std::vector<uint8_t> & buffer);
 	
-
 };
 
 class DNSHeader {
@@ -51,8 +51,8 @@ class DNSHeader {
 		uint16_t _numAdditRR;
 		
 		DNSHeader(uint16_t transId, DNSFlags* flags, uint16_t numQuestions, uint16_t numAnswers, uint16_t numAuthRR, uint16_t numAdditRR);
+		DNSHeader(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator end);
 		void toBuffer(std::vector<uint8_t> & buffer);
-
 
 };
 
@@ -98,6 +98,7 @@ class QuestionRecord{
 		
 		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
 		QuestionRecord(const char * name, ResourceTypes qType, ResourceClasses qClass);
+		QuestionRecord(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator end);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		
 
@@ -106,13 +107,16 @@ class QuestionRecord{
 struct ResourceRecord{
 
 	public:
-		char* name; // c style string
-		uint16_t rType;
-		uint16_t rClass;
-		uint32_t ttl;
-		uint16_t rdLength; //specified in octets
-		char* rData; //length of rdLength, not null terminated
+		std::vector<uint8_t> _name; // a sequence of octets that repeats the pattern: length octet = n, n octets 
+		uint16_t _rType;
+		uint16_t _rClass;
+		uint32_t _ttl;
+		uint16_t _rdLength; //specified in octets
+		std::vector<uint8_t> _rData; //length of rdLength, not null terminated
 		
+		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
+		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, td::vector<uint8_t> rData);
+		ResourceRecord(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator end);
 		void toBuffer(std::vector<uint8_t> & buffer);
 	
 
@@ -128,6 +132,7 @@ struct DNSMessage{
 		ResourceRecord* _additional; // zero or more resource records that are strictly not answers
 		
 		DNSMessage(DNSHeader* hdr, QuestionRecord* question, ResourceRecord* answer, ResourceRecord* authority, ResourceRecord* additional);
+		DNSMessage(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator end);
 		void toBuffer(std::vector<uint8_t> & buffer);
 
 };
