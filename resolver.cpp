@@ -59,15 +59,16 @@ shared_ptr< list<pair<string,string>> > readSafetyFile(string filePath){
 void sendTestQuery(){
 
 	DNSFlags flg(qrVals::query, opcodes::standard, 0, 0, 0, 0, 0, 0);
-	DNSHeader hdr(5, &flg, 1, 0, 0,0);
+	DNSHeader hdr(5, flg, 1, 0, 0,0);
 	string s = "google.com";
 	QuestionRecord q(s.c_str(), ResourceTypes::a, ResourceClasses::in);
-	DNSMessage msg(&hdr, &q, NULL, NULL, NULL );
+	DNSMessage msg(hdr, &q, NULL, NULL, NULL );
 	vector<uint8_t> v;
 	vector<uint8_t> resp;
 	msg.toBuffer(v);
 	sendMessageResolverClient(string("128.252.0.100"), v, resp);
-	DNSMessage res(resp);
+	DNSMessage res(resp.begin(), resp.end());
+	DNSMessage.print();
 	
 	
 }
