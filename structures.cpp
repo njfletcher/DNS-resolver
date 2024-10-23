@@ -7,7 +7,8 @@
 using namespace std;
 
 
-DNSFlags::DNSFlags(qrVals qr, opcodes opcode, uint8_t aa, uint8_t tc, uint8_t rd, uint8_t ra, uint8_t z, uint8_t rcode): _qr(qr), _opcode(opcode), _aa(aa), _tc(tc), _rd(rd), _z(z), _rcode(rcode){};
+DNSFlags::DNSFlags(){};
+DNSFlags::DNSFlags(uint8_t qr, uint8_t opcode, uint8_t aa, uint8_t tc, uint8_t rd, uint8_t ra, uint8_t z, uint8_t rcode): _qr(qr), _opcode(opcode), _aa(aa), _tc(tc), _rd(rd), _z(z), _rcode(rcode){};
 
 //iter is assumed to point to the start of the flags section
 //leaves iter at start of next section
@@ -27,6 +28,7 @@ DNSFlags::DNSFlags(vector<uint8_t>::iterator& iter, vector<uint8_t>::iterator en
 	else succeeded = false;	
 	
 	_qr = (firstByte & 0x1);
+	cout << "QRQRRRRRRRRRRRRRRRRRRRR" << (unsigned int) _qr << endl;
 	_opcode = (firstByte & 0xF) >> 1;
 	_aa = (firstByte & 0x1) >> 5;
 	_tc = (firstByte & 0x1) >> 6;
@@ -44,8 +46,8 @@ void DNSFlags::toBuffer(vector<uint8_t> & buffer){
 	uint8_t firstByte =0;
 	uint8_t secondByte =0;
 	
-	firstByte = firstByte | ((uint8_t)_qr & 0x1);
-	firstByte = firstByte | (((uint8_t)_opcode & 0xF) << 1);
+	firstByte = firstByte | (((uint8_t)_qr) & 0x1);
+	firstByte = firstByte | ((((uint8_t)_opcode) & 0xF) << 1);
 	firstByte = firstByte | ((_aa & 0x1) << 5);
 	firstByte = firstByte | ((_tc & 0x1) << 6);
 	firstByte = firstByte | ((_rd & 0x1) << 7);
@@ -74,6 +76,8 @@ void DNSFlags::print(){
 
 }
 
+DNSHeader::DNSHeader(){};
+
 DNSHeader::DNSHeader(uint16_t transId, const DNSFlags& flags, uint16_t numQuestions, uint16_t numAnswers, uint16_t numAuthRR, uint16_t numAdditRR): _transId(transId), _flags(flags), _numQuestions(numQuestions),_numAnswers(numAnswers), _numAuthRR(numAuthRR), _numAdditRR(numAdditRR){};
 
 //iter is assumed to point to the start of the header section
@@ -83,13 +87,13 @@ DNSHeader::DNSHeader(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator
 	_transId = 0;
 	if(!(distance(iter,end) < 2)){
 		
-		_transId = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_transId = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
 		succeeded = true;
 	}
 	
 	bool flagsSucceeded = false;
-	_flags(iter, end, flagsSucceeded);
+	_flags = DNSFlags(iter,end,flagsSucceeded);
 	
 	_numQuestions = 0;
 	_numAnswers = 0;
@@ -97,17 +101,17 @@ DNSHeader::DNSHeader(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator
 	_numAdditRR = 0;
 	if(!(distance(iter,end) < 8 || !flagsSucceeded)){
 		
-		_numQuestions = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_numQuestions = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
-		_numAnswers = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_numAnswers = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
-		_numAuthRR = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_numAuthRR = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
-		_numAdditRR = ((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_numAdditRR = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
 		succeeded = true;
 	}
-	else suceeded = false;
+	else succeeded = false;
 	
 }
 
@@ -136,7 +140,7 @@ void DNSHeader::print(){
 
 	cout << "++++++++++++++++++++++START DNS HEADER+++++++++++++++++++++++++++" << endl;
 	cout << "transId(id of query/response): " << _transId << endl; 
-	_flags->print();
+	_flags.print();
 	cout << "numQuestions(number of question records in body of message): " << _numQuestions << endl; 
 	cout << "numAnswers(number of answer records in body of message): " << _numAnswers << endl; 
 	cout << "numAuthRR(number of authoritative resource records in body of message): " << _numAuthRR << endl; 
@@ -181,7 +185,7 @@ void convertCStringToOctetForm(const char * name, vector<uint8_t>& buffer){
 
 }
 
-convertBufferNameToVector(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator end, vector<uint8_t> & vec){
+void convertBufferNameToVector(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator end, vector<uint8_t> & vec){
 
 	uint8_t currLength = 0;
 	uint8_t currCounter = 0;
@@ -208,7 +212,7 @@ convertBufferNameToVector(vector<uint8_t>::iterator & iter, vector<uint8_t>::ite
 
 }
 
-printOctetSeq(const vector<uint8_t> & nameSequence){
+void printOctetSeq(const vector<uint8_t> & nameSequence){
 
 
 	uint8_t currLength = 0;
@@ -237,7 +241,9 @@ printOctetSeq(const vector<uint8_t> & nameSequence){
 
 }
 
-QuestionRecord::QuestionRecord(const char * name, ResourceTypes qType, ResourceClasses qClass): _qType(qType), _qClass(qClass) {
+QuestionRecord::QuestionRecord(){};
+
+QuestionRecord::QuestionRecord(const char * name, uint16_t qType, uint16_t qClass): _qType(qType), _qClass(qClass) {
 
 	convertCStringToOctetForm(name, _name);
 };
@@ -251,9 +257,9 @@ QuestionRecord::QuestionRecord(vector<uint8_t>::iterator & iter, vector<uint8_t>
 	_qClass = 0;
 	if(!(distance(iter,end) < 4)){
 		
-		_qType = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_qType = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
-		_qClass = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_qClass = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
 		succeeded = true;
 	}
@@ -263,9 +269,9 @@ QuestionRecord::QuestionRecord(vector<uint8_t>::iterator & iter, vector<uint8_t>
 
 void QuestionRecord::toBuffer(vector<uint8_t> & buffer){
 
-	for(int i = 0; _name[i] != 0; i++){
+	for(auto iter = _name.begin(); iter != _name.end(); iter++){
 		
-		buffer.push_back(_name[i]);
+		buffer.push_back(*iter);
 	}
 	
 	buffer.push_back(((uint16_t)_qType & 0xff00) >> 8);
@@ -291,7 +297,9 @@ void QuestionRecord::print(uint16_t number = 0){
 
 }
 
-ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, td::vector<uint8_t> rData): _rType(rType), _rClass(rClass), _ttl(ttl), _rdLength(rdLength){
+ResourceRecord::ResourceRecord(){};
+
+ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, vector<uint8_t> rData): _rType(rType), _rClass(rClass), _ttl(ttl), _rdLength(rdLength){
 
 	_rData = rData;
 	convertCStringToOctetForm(name, _name);
@@ -308,20 +316,20 @@ ResourceRecord::ResourceRecord(vector<uint8_t>::iterator & iter, vector<uint8_t>
 	_rdLength = 0;
 	if(!(distance(iter,end) < 10)){
 		
-		_rType = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_rType = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
-		_rClass = (((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_rClass = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
-		_ttl = (((uint32_t)(*iter) & 0xff) << 24) | (((uint32_t) *(iter + 1) & 0xff) << 16) | (((uint32_t) *(iter + 2) & 0xff) << 8) | (((uint32_t) *(iter + 3) & 0xff));
+		_ttl = ((((uint32_t)(*iter)) & 0xff) << 24) | ((((uint32_t) *(iter + 1)) & 0xff) << 16) | ((((uint32_t) *(iter + 2)) & 0xff) << 8) | ((((uint32_t) *(iter + 3)) & 0xff));
 		iter = iter + 4;
-		_rdLength = ((uint16_t)(*iter) & 0xff) << 8) | (((uint16_t) *(iter + 1) & 0xff);
+		_rdLength = ((((uint16_t)(*iter)) & 0xff) << 8) | (((uint16_t) *(iter + 1)) & 0xff);
 		iter = iter + 2;
 		succeeded = true;
 	}
 	else succeeded = false;
 	
 	
-	for(uint16_t i = 0; (i < rdLength) && (iter != end); i++){
+	for(uint16_t i = 0; (i < _rdLength) && (iter != end); i++){
 		
 		_rData.push_back(*iter);
 		iter = iter + 1;
@@ -331,28 +339,28 @@ ResourceRecord::ResourceRecord(vector<uint8_t>::iterator & iter, vector<uint8_t>
 
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
-	for(int i = 0; name[i] != 0; i++){
+	for(auto iter = _name.begin(); iter != _name.end(); iter++){
 		
-		buffer.push_back(name[i]);
+		buffer.push_back(*iter);
 	}
 	
-	buffer.push_back((rType & 0xff00) >> 8);
-	buffer.push_back(rType & 0x00ff);
+	buffer.push_back((_rType & 0xff00) >> 8);
+	buffer.push_back(_rType & 0x00ff);
 
-	buffer.push_back((rClass & 0xff00) >> 8);
-	buffer.push_back(rClass & 0x00ff);
+	buffer.push_back((_rClass & 0xff00) >> 8);
+	buffer.push_back(_rClass & 0x00ff);
 	
-	buffer.push_back((ttl & 0xff000000) >> 24);
-	buffer.push_back((ttl & 0x00ff0000) >> 16);
-	buffer.push_back((ttl & 0x0000ff00) >> 8);
-	buffer.push_back(ttl & 0x000000ff);
+	buffer.push_back((_ttl & 0xff000000) >> 24);
+	buffer.push_back((_ttl & 0x00ff0000) >> 16);
+	buffer.push_back((_ttl & 0x0000ff00) >> 8);
+	buffer.push_back(_ttl & 0x000000ff);
 	
-	buffer.push_back((rdLength & 0xff00) >> 8);
-	buffer.push_back(rdLength & 0x00ff);
+	buffer.push_back((_rdLength & 0xff00) >> 8);
+	buffer.push_back(_rdLength & 0x00ff);
 
-	for(uint16_t i = 0; i < rdLength; i++){
+	for(uint16_t i = 0; i < _rdLength; i++){
 		
-		buffer.push_back(rData[i]);
+		buffer.push_back(_rData[i]);
 	}
 		
 }
@@ -368,7 +376,7 @@ void ResourceRecord::print(uint16_t number = 0){
 	cout << "rClass(class of the resource record): " << _rClass << endl; 
 	cout << "ttl(time to live): " << _ttl << endl; 
 	cout << "rdLength(length in octets of rdata section): " << _rdLength << endl; 
-	cout << "rData(resource data): ["
+	cout << "rData(resource data): [";
 	for(auto iter = _rData.begin(); iter != _rData.end(); iter++){
 		cout << " " << +(*iter);
 	}
@@ -379,32 +387,35 @@ void ResourceRecord::print(uint16_t number = 0){
 
 }
 
+DNSMessage::DNSMessage(){};
+
 DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, vector<ResourceRecord>& answer, vector<ResourceRecord>& authority, vector<ResourceRecord>& additional): _hdr(hdr), _question(question), _answer(answer), _authority(authority), _additional(additional){};
 
 DNSMessage::DNSMessage(vector<uint8_t>::iterator & iter, vector<uint8_t>::iterator end){
 
-	_hdr(iter,end);
-	
+
 	bool recordSucceeded = true;
-		
+	
+	_hdr = DNSHeader(iter, end, recordSucceeded);
+	
 	for(uint16_t i = 0; (i < _hdr._numQuestions) && recordSucceeded; i++){
 	
-		_question.pushback(QuestionRecord(iter,end,recordSucceeded));
+		_question.push_back(QuestionRecord(iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAnswers) && recordSucceeded; i++){
 	
-		_answer.pushback(ResourceRecord(iter,end,recordSucceeded));
+		_answer.push_back(ResourceRecord(iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAuthRR) && recordSucceeded; i++){
 	
-		_authority.pushback(ResourceRecord(iter,end,recordSucceeded));
+		_authority.push_back(ResourceRecord(iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAdditRR) && recordSucceeded; i++){
 	
-		_additional.pushback(ResourceRecord(iter,end,recordSucceeded));
+		_additional.push_back(ResourceRecord(iter,end,recordSucceeded));
 	}
 
 

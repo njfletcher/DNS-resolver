@@ -15,7 +15,7 @@ using namespace std;
 
 #define responseSize 2000
 
-void sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg, vector<uint8_t>& resp){
+int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg, vector<uint8_t>& resp){
 
 	const char * ipStr = serverIp.c_str();
 	uint16_t serverPort = 53;
@@ -80,7 +80,7 @@ void sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg, vect
 	cout << "SERVER MESSAGE END=============================================" << endl;
 	
 	close(clientSocket);
-	resp(buffer,buffer + (responseSize * sizeof(uint8_t));
+	resp = vector<uint8_t>(buffer,buffer + (responseSize * sizeof(uint8_t)));
 	
 	return 0;
 
