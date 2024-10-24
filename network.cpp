@@ -10,6 +10,7 @@
 #include <vector>
 #include <cstdint>
 #include <algorithm>
+#include <bitset>
 
 using namespace std;
 
@@ -74,6 +75,7 @@ int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg, vecto
 	cout <<endl;
 	cout << "SERVER MESSAGE START=============================================" << endl;
 	for(int i =0; i < 2000; i++){
+	
 		cout << (unsigned int)buffer[i] << " ";
 	
 	}

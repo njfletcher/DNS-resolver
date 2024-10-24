@@ -71,7 +71,7 @@ void sendTestQuery(){
 	msg.print();
 	sendMessageResolverClient(string("128.252.0.100"), buff, resp);
 	auto iter = resp.begin();
-	DNSMessage res(iter, resp.end());
+	DNSMessage res(iter, iter, resp.end());
 	res.print();
 	
 	

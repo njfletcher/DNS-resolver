@@ -6,6 +6,8 @@
 #include <string>
 #include <iterator>
 
+#define maxDomainNameLen 255
+
 enum class qrVals{
 
 	query = 0,
@@ -79,7 +81,7 @@ class DNSFlags{
 		
 		DNSFlags();
 		DNSFlags(uint8_t qr, uint8_t opcode, uint8_t aa, uint8_t tc, uint8_t rd, uint8_t ra, uint8_t z, uint8_t rcode);
-		DNSFlags(std::vector<uint8_t>::iterator & iter, std::vector<uint8_t>::iterator end, bool& succeeded);
+		DNSFlags(std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print();
 	
@@ -98,7 +100,7 @@ class DNSHeader {
 		
 		DNSHeader();
 		DNSHeader(uint16_t transId, const DNSFlags& flags, uint16_t numQuestions, uint16_t numAnswers, uint16_t numAuthRR, uint16_t numAdditRR);
-		DNSHeader(std::vector<uint8_t>::iterator & iter, std::vector<uint8_t>::iterator end, bool& succeeded);
+		DNSHeader(std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print();
 
@@ -115,7 +117,7 @@ class QuestionRecord{
 		QuestionRecord();
 		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
 		QuestionRecord(const char * name, uint16_t qType, uint16_t qClass);
-		QuestionRecord(std::vector<uint8_t>::iterator & iter, std::vector<uint8_t>::iterator end, bool& succeeded);
+		QuestionRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print(uint16_t number);
 		
@@ -135,7 +137,7 @@ class ResourceRecord{
 		ResourceRecord();
 		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
 		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
-		ResourceRecord(std::vector<uint8_t>::iterator & iter, std::vector<uint8_t>::iterator end, bool& succeeded);
+		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print(uint16_t number);
 	
@@ -153,7 +155,7 @@ class DNSMessage{
 		
 		DNSMessage();
 		DNSMessage(const DNSHeader& hdr, std::vector<QuestionRecord>& question, std::vector<ResourceRecord>& answer, std::vector<ResourceRecord>& authority, std::vector<ResourceRecord>& additional);
-		DNSMessage(std::vector<uint8_t>::iterator & iter, std::vector<uint8_t>::iterator end);
+		DNSMessage(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print();
 
