@@ -37,7 +37,10 @@ int main(int argc, char** argv){
 	
 	}
 	*/
-	sendTestQuery();
+	shared_ptr<DNSMessage> respPtr = sendStandardQuery("128.252.0.100","wustl.edu", 1);
+	DNSMessage resp = *respPtr;
+	resp.print();
+	printf("ip: %i", ResourceRecord::getIpAddressFromAAnswer(resp._answer[0]));
 	
 	return 0;
 

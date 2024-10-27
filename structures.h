@@ -127,6 +127,7 @@ class QuestionRecord{
 class ResourceRecord{
 
 	public:
+		
 		std::vector<uint8_t> _name; // a sequence of octets that repeats the pattern: length octet = n, n octets 
 		uint16_t _rType;
 		uint16_t _rClass;
@@ -140,6 +141,8 @@ class ResourceRecord{
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print(uint16_t number);
+		
+		static uint32_t getIpAddressFromAAnswer(const ResourceRecord & rec);
 	
 
 };

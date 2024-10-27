@@ -56,12 +56,12 @@ shared_ptr< list<pair<string,string>> > readSafetyFile(string filePath){
 }
 
 
-void sendTestQuery(){
+
+shared_ptr<DNSMessage> sendStandardQuery(string nameServerIp, string questionDomainName, uint16_t id){
 
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
-	DNSHeader hdr(5, flg, 1, 0, 0,0);
-	string s = "google.com";
-	QuestionRecord q(s.c_str(), (uint8_t)ResourceTypes::a, (uint8_t)ResourceClasses::in);
+	DNSHeader hdr(id, flg, 1, 0, 0,0);
+	QuestionRecord q(questionDomainName.c_str(), (uint16_t)ResourceTypes::a, (uint16_t)ResourceClasses::in);
 	vector<QuestionRecord> qr = {q};
 	vector<ResourceRecord> rr;
 	DNSMessage msg(hdr, qr, rr, rr, rr );
@@ -69,10 +69,8 @@ void sendTestQuery(){
 	vector<uint8_t> resp;
 	msg.toBuffer(buff);
 	msg.print();
-	sendMessageResolverClient(string("128.252.0.100"), buff, resp);
+	sendMessageResolverClient(nameServerIp, buff, resp);
 	auto iter = resp.begin();
-	DNSMessage res(iter, iter, resp.end());
-	res.print();
-	
-	
+	return make_shared<DNSMessage>(iter, iter, resp.end());
+
 }

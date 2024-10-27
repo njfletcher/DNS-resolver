@@ -189,8 +189,10 @@ bool checkCompression(vector<uint8_t>::iterator & iter, const vector<uint8_t>::i
 
 	if( (distance(iter,end) > 1) && ((*iter & 0xC0) == 0xC0)){
 		
-		iter = iter + 2;
-		offset = (((uint16_t)(*iter & 0x3F)) << 8) | (((uint8_t)(*iter + 1)) & 0xff);
+		offset = (((uint16_t)(*iter & 0x3F)) << 8);
+		iter = iter + 1;
+		offset = offset | (((uint8_t)*iter) & 0xff);
+		iter = iter + 1;
 		return true;
 	
 	}
@@ -429,6 +431,13 @@ void ResourceRecord::print(uint16_t number = 0){
 
 
 
+}
+
+uint32_t ResourceRecord::getIpAddressFromAAnswer(const ResourceRecord & rec){
+
+	if(rec._rData.size() < 4) return 0;
+	else return (((uint32_t)rec._rData[0]) << 24) |  (((uint32_t)rec._rData[1]) << 16) |  (((uint32_t)rec._rData[2]) << 8) |  (((uint32_t)rec._rData[3]));
+	
 }
 
 DNSMessage::DNSMessage(){};
