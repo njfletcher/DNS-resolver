@@ -74,3 +74,35 @@ shared_ptr<DNSMessage> sendStandardQuery(string nameServerIp, string questionDom
 	return make_shared<DNSMessage>(iter, iter, resp.end());
 
 }
+
+bool continueQuery(DNSMessage & resp, vector<uint32_t>& ips, vector<string> domainNames){
+
+	if(resp._hdr._flags.qr != (uint8_t) qrVals::response){
+		return false;
+	
+	}
+	
+	if(resp._hdr._flags._rcode != (uint8_t) ResponseCodes::none){
+		return false;
+	
+	}
+	
+	uint16_t numAnswersClaim = resp._hdr._numAnswers;
+	size_t numAnswersActual = resp._answer.size();
+	if(numAnswersClaim > 0){
+		
+		for(size_t i =0; i < numAnswersActual; i++){
+			ResourceRecord r = resp._answer[i];
+			if( r.
+		
+		}
+	
+	}
+	if(resp._hdr
+	ResourceRecord::getInternetData(resp._rData);
+
+
+
+} 
+
+

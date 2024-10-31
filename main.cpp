@@ -9,15 +9,18 @@
 
 using namespace std;
 
+#define argCount 3
+
 int main(int argc, char** argv){
 
-	if(argc < 2){
-		cout << "Provide a safety belt file" << endl;
+	if(argc < argCount){
+		cout << "provide a domain name and safety file" << endl;
 		return -1;
 	
 	}
+	
 
-	string fileP(argv[1]);
+	string fileP(argv[2]);
 	shared_ptr< list<pair<string,string>> > sPtr = readSafetyFile(fileP);
 	
 	/*if(sPtr == NULL){
@@ -37,10 +40,13 @@ int main(int argc, char** argv){
 	
 	}
 	*/
-	shared_ptr<DNSMessage> respPtr = sendStandardQuery("128.252.0.100","wustl.edu", 1);
+	shared_ptr<DNSMessage> respPtr = sendStandardQuery("128.252.0.100",argv[1], 1);
 	DNSMessage resp = *respPtr;
+	continueQuery(resp);
+	
 	resp.print();
 	printf("ip: %i", ResourceRecord::getIpAddressFromAAnswer(resp._answer[0]));
+
 	
 	return 0;
 

@@ -16,12 +16,12 @@ using namespace std;
 
 #define responseSize 2000
 
-int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg, vector<uint8_t>& resp){
+int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint8_t>& resp){
 
 	const char * ipStr = serverIp.c_str();
 	uint16_t serverPort = 53;
 	
-	int clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
+	int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 	
 	if(clientSocket < 0){
 		perror("cant create socket\n");
@@ -37,27 +37,38 @@ int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg, vecto
 		cout << "invalid ip conversion" << endl;
 		return -1;
 	}
-	
-	cout << "sending to server" << inet_ntoa(serverAddr.sin_addr) << endl;
+	cout << "sending to server " << inet_ntoa(serverAddr.sin_addr) << endl;
 	
 	if(msg.empty()){
 		cout << "need a message to send" << endl;
 		return -1;
 	}
 	
-	const uint8_t* msgArr = &msg[0];
+	uint16_t sz = msg.size();
+	
+	uint8_t* msgArr = &msg[0];
+	msgArr[0] = ((sz -2) & 0xff00) >> 7;
+	msgArr[1] = ((sz -2) & 0x00ff);
 	cout << "MY MESSAGE START=============================================" << endl;
-	for(int i =0; i < msg.size(); i++){
+	for(size_t i =0; i < sz; i++){
 		cout << (unsigned int)msgArr[i] << " ";
 	}
 	cout << endl;
 	cout << "MY MESSAGE END=============================================" << endl;
 	
-	int bytesSent = sendto(clientSocket, msgArr, msg.size(), MSG_CONFIRM, (struct sockaddr *) &serverAddr, sizeof(serverAddr)); 
+	
+	
+	if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0){
+		cout << "failed to connect" << endl;
+		return -1;
+	}
+	
+	int bytesSent = send(clientSocket, msgArr, sz, 0);
 	
 	cout << "sent bytes " << bytesSent << endl;
-	if(bytesSent < 0){
+	if(bytesSent < 1){
 		perror("cant send message\n");
+		close(clientSocket);
 		return -1;
 	
 	}
@@ -65,13 +76,15 @@ int sendMessageResolverClient(string serverIp, const vector<uint8_t>& msg, vecto
 	uint8_t buffer[responseSize] = {0};
 	
 	socklen_t outSize;
-	int bytesRec = recvfrom(clientSocket, buffer, responseSize, 0, (struct sockaddr *) &serverAddr, &outSize); 
+	int bytesRec = recv(clientSocket, buffer, sizeof(buffer), 0);
 	
 	cout << bytesRec << endl;
-	if(bytesRec < 0){
-		perror("read from server");
+	if(bytesRec < 1){
+		cout << "failed to read message from server" << endl;
+		close(clientSocket);
 		return -1;
 	}
+	
 	cout <<endl;
 	cout << "SERVER MESSAGE START=============================================" << endl;
 	for(int i =0; i < 2000; i++){

@@ -8,7 +8,7 @@
 using namespace std;
 
 DNSFlags::DNSFlags(){};
-DNSFlags::DNSFlags(uint8_t qr, uint8_t opcode, uint8_t aa, uint8_t tc, uint8_t rd, uint8_t ra, uint8_t z, uint8_t rcode): _qr(qr), _opcode(opcode), _aa(aa), _tc(tc), _rd(rd), _z(z), _rcode(rcode){};
+DNSFlags::DNSFlags(uint8_t qr, uint8_t opcode, uint8_t aa, uint8_t tc, uint8_t rd, uint8_t ra, uint8_t z, uint8_t rcode): _qr(qr), _opcode(opcode), _aa(aa), _tc(tc), _rd(rd), _ra(ra), _z(z), _rcode(rcode){};
 
 //iter is assumed to point to the start of the flags section
 //leaves iter at start of next section
@@ -192,6 +192,7 @@ bool checkCompression(vector<uint8_t>::iterator & iter, const vector<uint8_t>::i
 		offset = (((uint16_t)(*iter & 0x3F)) << 8);
 		iter = iter + 1;
 		offset = offset | (((uint8_t)*iter) & 0xff);
+		offset = offset + 2; //have to also account for tcp two byte length at beginning of message.
 		iter = iter + 1;
 		return true;
 	
@@ -433,10 +434,10 @@ void ResourceRecord::print(uint16_t number = 0){
 
 }
 
-uint32_t ResourceRecord::getIpAddressFromAAnswer(const ResourceRecord & rec){
+uint32_t ResourceRecord::GetInternetData(const vector<uint8_t> data){
 
-	if(rec._rData.size() < 4) return 0;
-	else return (((uint32_t)rec._rData[0]) << 24) |  (((uint32_t)rec._rData[1]) << 16) |  (((uint32_t)rec._rData[2]) << 8) |  (((uint32_t)rec._rData[3]));
+	if(data.size() < 4) return 0;
+	else return (((uint32_t)data[0]) << 24) |  (((uint32_t)data[1]) << 16) |  (((uint32_t)data[2]) << 8) |  (((uint32_t)data[3]));
 	
 }
 
@@ -446,6 +447,8 @@ DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, v
 
 DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end){
 
+	//first two will be tcp length, which can be disregarded
+	iter = iter + 2;
 
 	bool recordSucceeded = true;
 	
@@ -476,6 +479,10 @@ DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::i
 
 void DNSMessage::toBuffer(vector<uint8_t> & buffer){
 
+	//these two bytes will be filled by the network part with the length number(needed when using dns with tcp)
+	buffer.push_back(0);
+	buffer.push_back(0);
+	
 	_hdr.toBuffer(buffer);
 	
 	for(uint16_t i = 0; i < _hdr._numQuestions; i++){

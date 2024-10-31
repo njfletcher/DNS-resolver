@@ -135,14 +135,14 @@ class ResourceRecord{
 		uint16_t _rdLength; //specified in octets
 		std::vector<uint8_t> _rData; //length of rdLength, not null terminated
 		
-		ResourceRecord();
+		ResourceRecord();  wdadawd
 		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
 		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print(uint16_t number);
 		
-		static uint32_t getIpAddressFromAAnswer(const ResourceRecord & rec);
+		static uint32_t getInternetData(const std::vector<uint8_t> data);
 	
 
 };
