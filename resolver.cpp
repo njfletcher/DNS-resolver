@@ -75,15 +75,17 @@ shared_ptr<DNSMessage> sendStandardQuery(string nameServerIp, string questionDom
 
 }
 
-bool continueQuery(DNSMessage & resp, vector<uint32_t>& ips, vector<string> domainNames){
+int continueQuery(DNSMessage & resp, vector<uint32_t>& ips, vector<string>& domainNames){
 
-	if(resp._hdr._flags.qr != (uint8_t) qrVals::response){
-		return false;
+	vector<uint8_t> msgBuff;
+	resp.toBuffer(msgBuff);
+	if(resp._hdr._flags._qr != (uint8_t) qrVals::response){
+		return (int) SessionStates::failed;
 	
 	}
 	
 	if(resp._hdr._flags._rcode != (uint8_t) ResponseCodes::none){
-		return false;
+		return (int) SessionStates::failed;
 	
 	}
 	
@@ -93,15 +95,36 @@ bool continueQuery(DNSMessage & resp, vector<uint32_t>& ips, vector<string> doma
 		
 		for(size_t i =0; i < numAnswersActual; i++){
 			ResourceRecord r = resp._answer[i];
-			if( r.
+			if( r._rType == (uint8_t)ResourceTypes::a){
+			
+				uint32_t ip = ResourceRecord::getInternetData(r._rData);
+				if(ip > 0) ips.push_back(ip);
+			
+			}
 		
 		}
+		if(ips.size() > 0) return (int) SessionStates::answered;
 	
 	}
-	if(resp._hdr
-	ResourceRecord::getInternetData(resp._rData);
-
-
+	
+	uint16_t numAuthClaim = resp._hdr._numAuthRR;
+	size_t numAuthActual = resp._authority.size();
+	if(numAuthClaim > 0){
+		
+		for(size_t i =0; i < numAuthActual; i++){
+			ResourceRecord r = resp._authority[i];
+			if( r._rType == (uint8_t)ResourceTypes::ns){
+				domainNames.push_back(ResourceRecord::getNSData(msgBuff, r._rData));
+			
+			}
+		
+		}
+		
+		return (int) SessionStates::continued;
+	
+	}
+	else return (int) SessionStates::failed;
+	
 
 } 
 

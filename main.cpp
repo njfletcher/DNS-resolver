@@ -20,33 +20,29 @@ int main(int argc, char** argv){
 	}
 	
 
-	string fileP(argv[2]);
-	shared_ptr< list<pair<string,string>> > sPtr = readSafetyFile(fileP);
+
 	
-	/*if(sPtr == NULL){
-		cout << "invalid list" << endl;
-		return -1;
+	shared_ptr<DNSMessage> respPtr = sendStandardQuery("128.252.0.100",argv[1], 1);
+	DNSMessage resp = *respPtr;
+	resp.print();
 	
-	}
-	else{
-	
-		list<pair<string,string>> servers = *sPtr;
-		for(auto iter = servers.begin(); iter != servers.end(); iter++){
+	vector<uint32_t> ips;
+	vector<string> nms;
+	int ret = continueQuery(resp,ips,nms);
+	if(ret == (int) SessionStates::answered){
+		printf("ip: %i", ips[0]);
 		
-			pair<string,string> server = *iter;
-			cout << server.first << " " << server.second << endl;
-			sendMessageResolverClient(server.first);
+	}
+	else if (ret == (int) SessionStates::continued){
+	
+		for(auto iter = nms.begin(); iter != nms.end(); iter++){
+			cout << *iter << " " << endl;
+		
 		}
 	
 	}
-	*/
-	shared_ptr<DNSMessage> respPtr = sendStandardQuery("128.252.0.100",argv[1], 1);
-	DNSMessage resp = *respPtr;
-	continueQuery(resp);
 	
-	resp.print();
-	printf("ip: %i", ResourceRecord::getIpAddressFromAAnswer(resp._answer[0]));
-
+	
 	
 	return 0;
 

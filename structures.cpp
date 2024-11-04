@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iterator>
 #include <bitset>
+#include "resolver.h"
 
 using namespace std;
 
@@ -259,6 +260,8 @@ void convertBufferNameToVector(vector<uint8_t>::iterator start, vector<uint8_t>:
 
 }
 
+
+
 void printOctetSeq(const vector<uint8_t> & nameSequence){
 
 
@@ -434,10 +437,25 @@ void ResourceRecord::print(uint16_t number = 0){
 
 }
 
-uint32_t ResourceRecord::GetInternetData(const vector<uint8_t> data){
+uint32_t ResourceRecord::getInternetData(vector<uint8_t> data){
 
 	if(data.size() < 4) return 0;
 	else return (((uint32_t)data[0]) << 24) |  (((uint32_t)data[1]) << 16) |  (((uint32_t)data[2]) << 8) |  (((uint32_t)data[3]));
+	
+}
+
+string ResourceRecord::getNSData(vector<uint8_t> msgBuff, vector<uint8_t> data){
+	
+	vector<uint8_t> realDomain;
+	vector<uint8_t>::iterator beg = data.begin();
+	convertBufferNameToVector(msgBuff.begin(), beg, msgBuff.end(), realDomain, 0);
+	
+	string s;
+	for(auto iter = realDomain.begin(); iter != realDomain.end(); iter++){
+		s += *iter;
+	
+	}
+	return s;
 	
 }
 
@@ -512,25 +530,35 @@ void DNSMessage::print(){
 	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START DNSMESSAGE^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	_hdr.print();
 	
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START QUESTIONS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	for(uint16_t i = 0; i < _hdr._numQuestions; i++){
 	
 		_question[i].print(i);
 	}
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END QUESTIONS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START ANSWERS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
 	for(uint16_t i = 0; i < _hdr._numAnswers; i++){
 	
 		_answer[i].print(i);
 	}
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END ANSWERS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START AUTHORITY^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	for(uint16_t i = 0; i < _hdr._numAuthRR; i++){
 	
 		_authority[i].print(i);
 	}
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END AUTHORITY^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START ADDITIONAL^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
 	for(uint16_t i = 0; i < _hdr._numAdditRR; i++){
 	
 		_additional[i].print(i);
 	}
+	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END ADDITIONAL^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END DNSMESSAGE^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
 

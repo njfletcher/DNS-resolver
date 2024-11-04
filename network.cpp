@@ -11,10 +11,12 @@
 #include <cstdint>
 #include <algorithm>
 #include <bitset>
+#include <netinet/tcp.h>
 
 using namespace std;
 
 #define responseSize 2000
+
 
 int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint8_t>& resp){
 
@@ -23,9 +25,12 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 	int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 	
+	int retries = 2;
+	setsockopt(clientSocket, IPPROTO_TCP, TCP_SYNCNT, &retries, sizeof(retries));
+	
 	if(clientSocket < 0){
 		perror("cant create socket\n");
-		return -1;
+		return (int)NetworkErrors::socket;
 	
 	}
 
@@ -35,13 +40,13 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	int success = inet_aton(ipStr, &(serverAddr.sin_addr));
 	if(success == 0){
 		cout << "invalid ip conversion" << endl;
-		return -1;
+		return (int)NetworkErrors::user;
 	}
 	cout << "sending to server " << inet_ntoa(serverAddr.sin_addr) << endl;
 	
 	if(msg.empty()){
 		cout << "need a message to send" << endl;
-		return -1;
+		return (int)NetworkErrors::user;
 	}
 	
 	uint16_t sz = msg.size();
@@ -60,7 +65,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 	if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0){
 		cout << "failed to connect" << endl;
-		return -1;
+		return (int)NetworkErrors::socket;
 	}
 	
 	int bytesSent = send(clientSocket, msgArr, sz, 0);
@@ -69,7 +74,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	if(bytesSent < 1){
 		perror("cant send message\n");
 		close(clientSocket);
-		return -1;
+		return (int)NetworkErrors::sending;
 	
 	}
 	
@@ -82,7 +87,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	if(bytesRec < 1){
 		cout << "failed to read message from server" << endl;
 		close(clientSocket);
-		return -1;
+		return (int)NetworkErrors::recieving;
 	}
 	
 	cout <<endl;
@@ -97,6 +102,6 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	close(clientSocket);
 	resp = vector<uint8_t>(buffer,buffer + (responseSize * sizeof(uint8_t)));
 	
-	return 0;
+	return (int)NetworkErrors::none;
 
 }

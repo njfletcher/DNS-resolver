@@ -1,2 +1,5 @@
 cnn.com to 128.252.0.100: no answers, sends a lot of resource records
 google.com to 128.252.0.100: sends a single answer
+
+if answer: return to user
+if authority NS: look for address of this domain in cache or additional section. Reach out to ns with ip you found.
