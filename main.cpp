@@ -36,7 +36,7 @@ int main(int argc, char** argv){
 	else if (ret == (int) SessionStates::continued){
 	
 		for(auto iter = nms.begin(); iter != nms.end(); iter++){
-			cout << *iter << " " << endl;
+			cout << "domain " << *iter << " " << endl;
 		
 		}
 	

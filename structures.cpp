@@ -202,17 +202,26 @@ bool checkCompression(vector<uint8_t>::iterator & iter, const vector<uint8_t>::i
 
 }
 
-void convertBufferNameToVector(vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, vector<uint8_t> & vec, uint8_t bytesRead){
+void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<uint8_t>::iterator & mainMsgIter, const vector<uint8_t>::iterator mainMsgEnd, vector<uint8_t> & vec, uint8_t bytesRead, vector<uint8_t>* optMsg= NULL ){
 
 	uint8_t currLength = 0;
 	uint8_t currCounter = 0;
 	
+	vector<uint8_t>::iterator optStart;
+	if(optMsg != NULL){
+		optStart = optMsg->begin();
+	}
+	
+	vector<uint8_t>::iterator start = (optMsg != NULL) ? optStart : mainMsgStart;
+	vector<uint8_t>::iterator & iter = (optMsg != NULL) ? optStart : mainMsgIter;
+	vector<uint8_t>::iterator end = (optMsg != NULL) ? optMsg->end() : mainMsgEnd;
+		
 	uint16_t compOffset = 0;
 	//first out of two compressions options, name field is simply a pointer to a whole domain label series situated somewhere else.
 	if( checkCompression(iter, end, compOffset)){
 		
-		vector<uint8_t>::iterator pointStart = start + compOffset;//make a copy so reading name somewhere else doesnt affect current position of our packet iter.
-		convertBufferNameToVector(start, pointStart, end, vec, bytesRead + 2);
+		vector<uint8_t>::iterator pointStart = mainMsgStart + compOffset;//make a copy so reading name somewhere else doesnt affect current position of our packet iter.
+		convertBufferNameToVector(mainMsgStart, pointStart, mainMsgEnd, vec, bytesRead + 2, NULL);
 	
 	}
 	else{
@@ -234,9 +243,9 @@ void convertBufferNameToVector(vector<uint8_t>::iterator start, vector<uint8_t>:
 				}
 				//second of two compression options, name field has series of labels that ends with labels at location specified by pointer.
 				else if (checkCompression(iter, end, compOffset)){
-					
-					vector<uint8_t>::iterator pointStart = start + compOffset;//make a copy so reading name somewhere else doesnt affect current position of our packet iter.
-					convertBufferNameToVector(start, pointStart, end, vec, bytesRead + 1);
+							
+					vector<uint8_t>::iterator pointStart = mainMsgStart + compOffset;//make a copy so reading name somewhere else doesnt affect current position of our packet iter.
+					convertBufferNameToVector(mainMsgStart, pointStart, mainMsgEnd, vec, bytesRead + 1,NULL);
 				}
 				
 		
@@ -259,7 +268,6 @@ void convertBufferNameToVector(vector<uint8_t>::iterator start, vector<uint8_t>:
 
 
 }
-
 
 
 void printOctetSeq(const vector<uint8_t> & nameSequence){
@@ -444,11 +452,11 @@ uint32_t ResourceRecord::getInternetData(vector<uint8_t> data){
 	
 }
 
-string ResourceRecord::getNSData(vector<uint8_t> msgBuff, vector<uint8_t> data){
+string ResourceRecord::getNSData(vector<uint8_t>& msgBuff, vector<uint8_t>& data){
 	
 	vector<uint8_t> realDomain;
-	vector<uint8_t>::iterator beg = data.begin();
-	convertBufferNameToVector(msgBuff.begin(), beg, msgBuff.end(), realDomain, 0);
+	vector<uint8_t>::iterator beg = msgBuff.begin();
+	convertBufferNameToVector(beg , beg, msgBuff.end(), realDomain, 0, &data);
 	
 	string s;
 	for(auto iter = realDomain.begin(); iter != realDomain.end(); iter++){

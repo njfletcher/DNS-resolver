@@ -85,7 +85,7 @@ class ResourceRecord{
 		void print(uint16_t number);
 		
 		static uint32_t getInternetData(std::vector<uint8_t> data);
-		static std::string getNSData(std::vector<uint8_t> msgBuff, std::vector<uint8_t> data);
+		static std::string getNSData(std::vector<uint8_t>& msgBuff, std::vector<uint8_t>& data);
 	
 
 };
