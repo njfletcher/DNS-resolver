@@ -186,14 +186,16 @@ void convertCStringToOctetForm(const char * name, vector<uint8_t>& buffer){
 }
 
 
-bool checkCompression(vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, uint16_t & offset){
+bool checkCompression(vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, uint16_t & offset, vector<uint8_t>& buff){
 
 	if( (distance(iter,end) > 1) && ((*iter & 0xC0) == 0xC0)){
 		
 		offset = (((uint16_t)(*iter & 0x3F)) << 8);
+		buff.push_back(*iter);
 		iter = iter + 1;
 		offset = offset | (((uint8_t)*iter) & 0xff);
 		offset = offset + 2; //have to also account for tcp two byte length at beginning of message.
+		buff.push_back(*iter);
 		iter = iter + 1;
 		return true;
 	
@@ -204,6 +206,7 @@ bool checkCompression(vector<uint8_t>::iterator & iter, const vector<uint8_t>::i
 
 void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<uint8_t>::iterator & mainMsgIter, const vector<uint8_t>::iterator mainMsgEnd, vector<uint8_t> & vec, uint8_t bytesRead, vector<uint8_t>* optMsg= NULL ){
 
+	cout << endl;
 	uint8_t currLength = 0;
 	uint8_t currCounter = 0;
 	
@@ -218,8 +221,9 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 		
 	uint16_t compOffset = 0;
 	//first out of two compressions options, name field is simply a pointer to a whole domain label series situated somewhere else.
-	if( checkCompression(iter, end, compOffset)){
+	if( checkCompression(iter, end, compOffset,vec)){
 		
+		cout << "head compression " << compOffset << " ";
 		vector<uint8_t>::iterator pointStart = mainMsgStart + compOffset;//make a copy so reading name somewhere else doesnt affect current position of our packet iter.
 		convertBufferNameToVector(mainMsgStart, pointStart, mainMsgEnd, vec, bytesRead + 2, NULL);
 	
@@ -231,10 +235,12 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 			//this byte should be a length byte
 			if(currCounter >= currLength){
 			
-				vec.push_back(*iter);
 				currCounter = 0;
 				currLength = *iter;
 				bytesRead = bytesRead + 1;
+				vec.push_back(*iter);
+				
+				cout << "length " << (int) currLength << " ";
 				
 				//0 length terminator
 				if(currLength == 0) {
@@ -242,10 +248,12 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 					break;
 				}
 				//second of two compression options, name field has series of labels that ends with labels at location specified by pointer.
-				else if (checkCompression(iter, end, compOffset)){
-							
+				if (checkCompression(iter, end, compOffset,vec)){
+						
+					cout << "tail compression " << compOffset << " ";
 					vector<uint8_t>::iterator pointStart = mainMsgStart + compOffset;//make a copy so reading name somewhere else doesnt affect current position of our packet iter.
 					convertBufferNameToVector(mainMsgStart, pointStart, mainMsgEnd, vec, bytesRead + 1,NULL);
+					break;
 				}
 				
 		
@@ -256,6 +264,7 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 				currCounter = currCounter + 1;
 				bytesRead = bytesRead + 1;
 				vec.push_back(*iter);
+				cout << *iter << " ";
 
 			}
 		}	
@@ -285,12 +294,60 @@ void printOctetSeq(const vector<uint8_t> & nameSequence){
 			currCounter = 0;
 			//0 length terminator
 			if(currLength == 0) break;
+			if((currLength & 0xC0) == 0xC0){
+			
+				uint16_t offset = (((uint16_t)(*iter & 0x3F)) << 8);
+				iter = iter + 1;
+				offset = offset | (((uint8_t)*iter) & 0xff);
+				offset = offset + 2;
+				
+				cout << "compressed w/ offset: " << offset << " ";
+			}
 		
 		}
 		//still reading a label
 		else{
 			currCounter = currCounter + 1;
 			cout << " " << (*iter);
+
+		}
+	
+	}
+
+
+}
+
+void convertOctetSequenceToBuffer(const vector<uint8_t> & nameSequence, vector<uint8_t>& buffer){
+
+
+	uint8_t currLength = 0;
+	uint8_t currCounter = 0;
+	for(auto iter = nameSequence.begin(); iter != nameSequence.end(); iter++){
+	
+		//this byte should be a length byte
+		if(currCounter >= currLength){
+			
+			currLength = *iter;
+			buffer.push_back(*iter);
+			currCounter = 0;
+			
+			//0 length terminator
+			if(currLength == 0) break;
+			if((currLength & 0xC0 )== 0xC0){
+			
+				uint16_t offset = (((uint16_t)(*iter & 0x3F)) << 8);
+				iter = iter + 1;
+				offset = offset | (((uint8_t)*iter) & 0xff);
+				offset = offset + 2;
+				buffer.push_back(*iter);
+				break;
+			}
+		
+		}
+		//still reading a label
+		else{
+			currCounter = currCounter + 1;
+			buffer.push_back(*iter);
 
 		}
 	
@@ -327,10 +384,7 @@ QuestionRecord::QuestionRecord(const vector<uint8_t>::iterator start, vector<uin
 
 void QuestionRecord::toBuffer(vector<uint8_t> & buffer){
 
-	for(auto iter = _name.begin(); iter != _name.end(); iter++){
-		
-		buffer.push_back(*iter);
-	}
+	convertOctetSequenceToBuffer(_name, buffer);
 	
 	buffer.push_back(((uint16_t)_qType & 0xff00) >> 8);
 	buffer.push_back((uint16_t)_qType & 0xff);
@@ -397,10 +451,7 @@ ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uin
 
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
-	for(auto iter = _name.begin(); iter != _name.end(); iter++){
-		
-		buffer.push_back(*iter);
-	}
+	convertOctetSequenceToBuffer(_name, buffer);
 	
 	buffer.push_back((_rType & 0xff00) >> 8);
 	buffer.push_back(_rType & 0x00ff);
@@ -456,7 +507,15 @@ string ResourceRecord::getNSData(vector<uint8_t>& msgBuff, vector<uint8_t>& data
 	
 	vector<uint8_t> realDomain;
 	vector<uint8_t>::iterator beg = msgBuff.begin();
+	cout << "BUFFER" << endl;
+	for(auto iter = msgBuff.begin(); iter != msgBuff.end(); iter++){
+		cout << (int) *iter << " ";
+	
+	}
+	cout << endl;
 	convertBufferNameToVector(beg , beg, msgBuff.end(), realDomain, 0, &data);
+	
+	
 	
 	string s;
 	for(auto iter = realDomain.begin(); iter != realDomain.end(); iter++){
