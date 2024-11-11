@@ -9,6 +9,7 @@
 #include "structures.h"
 #include <vector>
 #include "network.h"
+#include <arpa/inet.h>
 using namespace std;
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
@@ -75,7 +76,21 @@ shared_ptr<DNSMessage> sendStandardQuery(string nameServerIp, string questionDom
 
 }
 
-int continueQuery(DNSMessage & resp, vector<uint32_t>& ips, vector<string>& domainNames){
+string convertIpIntToString(uint32_t ip){
+
+	char buffer[INET_ADDRSTRLEN];
+	struct in_addr a;
+	a.s_addr = ip;
+	
+	inet_ntop(AF_INET, &a, buffer, INET_ADDRSTRLEN);
+	
+	string s = string(buffer);
+	
+	return s;
+
+}
+
+int continueQuery(DNSMessage & resp, vector<string>& answerIps, vector<pair <string, string> >& authMaps, vector<pair <string, string> >& additMaps){
 
 	vector<uint8_t> msgBuff;
 	resp.toBuffer(msgBuff);
@@ -98,12 +113,12 @@ int continueQuery(DNSMessage & resp, vector<uint32_t>& ips, vector<string>& doma
 			if( r._rType == (uint8_t)ResourceTypes::a){
 			
 				uint32_t ip = ResourceRecord::getInternetData(r._rData);
-				if(ip > 0) ips.push_back(ip);
+				if(ip > 0) answerIps.push_back(convertIpIntToString(ip));
 			
 			}
 		
 		}
-		if(ips.size() > 0) return (int) SessionStates::answered;
+		if(answerIps.size() > 0) return (int) SessionStates::answered;
 	
 	}
 	
@@ -114,8 +129,39 @@ int continueQuery(DNSMessage & resp, vector<uint32_t>& ips, vector<string>& doma
 		for(size_t i =0; i < numAuthActual; i++){
 			ResourceRecord r = resp._authority[i];
 			if( r._rType == (uint8_t)ResourceTypes::ns){
-				domainNames.push_back(ResourceRecord::getNSData(msgBuff, r._rData));
+				string domain = ResourceRecord::getNSData(msgBuff, r._rData);
+				pair<string, string> p(domain,"");
+				authMaps.push_back(p);
+			}
+		
+		}
+	
+	}
+	
+	uint16_t numAdditClaim = resp._hdr._numAdditRR;
+	size_t numAdditActual = resp._additional.size();
+	if(numAdditClaim > 0){
+		
+		for(size_t i =0; i < numAdditActual; i++){
+			ResourceRecord r = resp._additional[i];
+			if( r._rType == (uint8_t)ResourceTypes::a){
 			
+				string name = convertOctetSeqToString(r._name);
+				uint32_t ip = ResourceRecord::getInternetData(r._rData);
+				bool matched = false;
+				for(auto iter = authMaps.begin(); iter != authMaps.end(); iter++){
+					pair<string, string>& p = *iter;
+					if(p.first == name){
+						p.second = convertIpIntToString(ip);
+						matched = true;
+						break;
+					}
+				
+				}
+				if(!matched){
+					pair<string, string > p(name,convertIpIntToString(ip));
+					additMaps.push_back(p);
+				}
 			}
 		
 		}
@@ -123,8 +169,10 @@ int continueQuery(DNSMessage & resp, vector<uint32_t>& ips, vector<string>& doma
 		return (int) SessionStates::continued;
 	
 	}
-	else return (int) SessionStates::failed;
 	
+	
+	
+	return (int) SessionStates::failed;
 
 } 
 

@@ -49,6 +49,8 @@ class DNSHeader {
 };
 
 
+std::string convertOctetSeqToString(const std::vector<uint8_t> & nameSequence);
+
 class QuestionRecord{
 
 	public:

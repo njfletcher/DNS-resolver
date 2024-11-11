@@ -74,7 +74,7 @@ enum class ResponseCodes{
 
 std::shared_ptr< std::list<std::pair<std::string,std::string>> > readSafetyFile(std::string filePath);
 std::shared_ptr<DNSMessage> sendStandardQuery(std::string nameServerIp, std::string questionDomainName, uint16_t id);
-int continueQuery(DNSMessage & resp, std::vector<uint32_t>& ips, std::vector<std::string>& domainNames);
+int continueQuery(DNSMessage & resp, std::vector<std::string>& answerIps, std::vector<std::pair<std::string, std::string> >& authMaps, std::vector<std::pair<std::string, std::string> >& additMaps);
 
 
 
