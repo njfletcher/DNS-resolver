@@ -149,6 +149,12 @@ void DNSHeader::print(){
 
 }
 
+/*
+convertCStringToOctetForm-
+
+takes a c string of a domain name that is seperated by periods, and converts it into a buffer that follows the octet form(with length bytes).
+ie: a.domain.net becomes 1 a 6 d o m a i n 3 n e t 0
+*/
 
 void convertCStringToOctetForm(const char * name, vector<uint8_t>& buffer){
 	
@@ -203,6 +209,16 @@ bool checkCompression(vector<uint8_t>::iterator & iter, const vector<uint8_t>::i
 	else return false;
 
 }
+
+/*
+convertBufferNameToVector-
+
+takes a begin, current, and end iterator of a vector that holds the raw data of a dns message recieved by the network layer. Turns this into a vector of the full domain name that results from unwrapping multiple layers of compression(if there are any). 
+Takes an optional message that acts as an alternative start to the sequence. Once a compression double byte is encountered, it hands control of the sequence to the main message buffer.
+An example of when this is needed is the rData section of an NS resource record. This data will be in the octet form, possibly with compression. Want to start with this seperate rData vector, then if compression is found
+start traversing the compression pointers using the whole message.
+
+*/
 
 void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<uint8_t>::iterator & mainMsgIter, const vector<uint8_t>::iterator mainMsgEnd, vector<uint8_t> & vec, uint8_t bytesRead, vector<uint8_t>* optMsg= NULL ){
 
@@ -276,6 +292,12 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 
 }
 
+/*
+printOctetSeq-
+
+takes a vector in octet form of a domain name that includes length bytes and compression indicator/offset bytes.
+Prints special messages when a length or compression byte is encountered.
+*/
 
 void printOctetSeq(const vector<uint8_t> & nameSequence){
 
@@ -316,6 +338,18 @@ void printOctetSeq(const vector<uint8_t> & nameSequence){
 
 }
 
+/*
+convertOctetSequenceToBuffer-
+
+takes a vector in octet form of a domain name that includes length bytes and compression indicator/offset bytes.
+Writes to the buffer the above sequence until after it finds a compression indicator and offset bytes(if there are any at all).
+This allows for the original compression byte sequence to be preserved. 
+This is important if this namesequence was read in from a response. 
+Say the response had compression, the name vector the response holds will be filled with the whole domain name, ie the result of unwrapping various levels of compression.
+If this was written back to a buffer as is, the original byte count/sequence of the response would not be preserved and the message would be corrupted.
+So stop writing to the buffer after we see the first compression, which is how the response wouldve been originally.
+*/
+
 void convertOctetSequenceToBuffer(const vector<uint8_t> & nameSequence, vector<uint8_t>& buffer){
 
 	uint8_t currLength = 0;
@@ -352,10 +386,11 @@ void convertOctetSequenceToBuffer(const vector<uint8_t> & nameSequence, vector<u
 }
 
 /*
-convertOctetSeqToString
+convertOctetSeqToString-
 
-
-
+takes a vector in octet form of a domain name that includes length bytes and compression indicator/offset bytes.
+converts this to a string that does not have any length/compression bytes, only the ascii labels(seperated by periods).
+ie: 1 a compr offset 10 restDomain 0 becomes a.restDomain
 */
 
 string convertOctetSeqToString(const vector<uint8_t> & nameSequence){
