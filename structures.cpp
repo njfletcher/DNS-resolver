@@ -206,7 +206,6 @@ bool checkCompression(vector<uint8_t>::iterator & iter, const vector<uint8_t>::i
 
 void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<uint8_t>::iterator & mainMsgIter, const vector<uint8_t>::iterator mainMsgEnd, vector<uint8_t> & vec, uint8_t bytesRead, vector<uint8_t>* optMsg= NULL ){
 
-	cout << endl;
 	uint8_t currLength = 0;
 	uint8_t currCounter = 0;
 	
@@ -223,7 +222,6 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 	//first out of two compressions options, name field is simply a pointer to a whole domain label series situated somewhere else.
 	if( checkCompression(iter, end, compOffset,vec)){
 		
-		cout << "head compression " << compOffset << " ";
 		vector<uint8_t>::iterator pointStart = mainMsgStart + compOffset;//make a copy so reading name somewhere else doesnt affect current position of our packet iter.
 		convertBufferNameToVector(mainMsgStart, pointStart, mainMsgEnd, vec, bytesRead + 2, NULL);
 	
@@ -238,22 +236,23 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 				currCounter = 0;
 				currLength = *iter;
 				bytesRead = bytesRead + 1;
-				vec.push_back(*iter);
 				
-				cout << "length " << (int) currLength << " ";
-				
-				//0 length terminator
-				if(currLength == 0) {
-					iter = iter + 1;
-					break;
-				}
 				//second of two compression options, name field has series of labels that ends with labels at location specified by pointer.
 				if (checkCompression(iter, end, compOffset,vec)){
 						
-					cout << "tail compression " << compOffset << " ";
 					vector<uint8_t>::iterator pointStart = mainMsgStart + compOffset;//make a copy so reading name somewhere else doesnt affect current position of our packet iter.
 					convertBufferNameToVector(mainMsgStart, pointStart, mainMsgEnd, vec, bytesRead + 1,NULL);
 					break;
+				}
+				else{
+									
+					vec.push_back(*iter);
+					//0 length terminator
+					if(currLength == 0) {
+						iter = iter + 1;
+						break;
+					}	
+				
 				}
 				
 		
@@ -264,7 +263,6 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 				currCounter = currCounter + 1;
 				bytesRead = bytesRead + 1;
 				vec.push_back(*iter);
-				cout << *iter << " ";
 
 			}
 		}	
@@ -281,7 +279,6 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 
 void printOctetSeq(const vector<uint8_t> & nameSequence){
 
-
 	uint8_t currLength = 0;
 	uint8_t currCounter = 0;
 	for(auto iter = nameSequence.begin(); iter != nameSequence.end(); iter++){
@@ -290,25 +287,27 @@ void printOctetSeq(const vector<uint8_t> & nameSequence){
 		if(currCounter >= currLength){
 			
 			currLength = *iter;
-			cout << " len: " << (+currLength) << " label: ";
-			currCounter = 0;
-			//0 length terminator
-			if(currLength == 0) break;
 			if((currLength & 0xC0) == 0xC0){
 			
 				uint16_t offset = (((uint16_t)(*iter & 0x3F)) << 8);
 				iter = iter + 1;
 				offset = offset | (((uint8_t)*iter) & 0xff);
 				offset = offset + 2;
-				
+				currLength = 0;
+				currCounter =0;
 				cout << "compressed w/ offset: " << offset << " ";
 			}
-		
+			else{
+				cout << " len: " << (+currLength) << " label: ";
+				currCounter = 0;
+				//0 length terminator
+				if(currLength == 0) break;
+			}
 		}
 		//still reading a label
 		else{
 			currCounter = currCounter + 1;
-			cout << " " << (*iter);
+			cout << " " << (*iter) << " ";
 
 		}
 	
@@ -319,7 +318,6 @@ void printOctetSeq(const vector<uint8_t> & nameSequence){
 
 void convertOctetSequenceToBuffer(const vector<uint8_t> & nameSequence, vector<uint8_t>& buffer){
 
-
 	uint8_t currLength = 0;
 	uint8_t currCounter = 0;
 	for(auto iter = nameSequence.begin(); iter != nameSequence.end(); iter++){
@@ -328,21 +326,18 @@ void convertOctetSequenceToBuffer(const vector<uint8_t> & nameSequence, vector<u
 		if(currCounter >= currLength){
 			
 			currLength = *iter;
-			buffer.push_back(*iter);
-			currCounter = 0;
-			
-			//0 length terminator
-			if(currLength == 0) break;
-			if((currLength & 0xC0 )== 0xC0){
-			
-				uint16_t offset = (((uint16_t)(*iter & 0x3F)) << 8);
+			if((currLength & 0xC0) == 0xC0){
+				buffer.push_back(*iter);
 				iter = iter + 1;
-				offset = offset | (((uint8_t)*iter) & 0xff);
-				offset = offset + 2;
 				buffer.push_back(*iter);
 				break;
 			}
-		
+			else{
+				buffer.push_back(*iter);
+				currCounter = 0;
+				//0 length terminator
+				if(currLength == 0) break;
+			}
 		}
 		//still reading a label
 		else{
@@ -353,6 +348,53 @@ void convertOctetSequenceToBuffer(const vector<uint8_t> & nameSequence, vector<u
 	
 	}
 
+
+}
+
+/*
+convertOctetSeqToString
+
+
+
+*/
+
+string convertOctetSeqToString(const vector<uint8_t> & nameSequence){
+
+	string s;
+	uint8_t currLength = 0;
+	uint8_t currCounter = 0;
+	bool first = true;
+	
+	for(auto iter = nameSequence.begin(); iter != nameSequence.end(); iter++){
+	
+		//this byte should be a length byte(dont want any length byte or compression byte in this string)
+		if(currCounter >= currLength){
+			
+			currLength = *iter;
+			if((currLength & 0xC0) == 0xC0){
+				iter = iter + 1;
+				currLength = 0;
+				currCounter =0;
+			}
+			else{
+				currCounter = 0;
+				//0 length terminator
+				if(currLength == 0) break;
+				else {
+					if (!first) s += ".";
+					first = false;
+				}
+			}
+		}
+		//still reading a label
+		else{
+			currCounter = currCounter + 1;
+			s += *iter;
+
+		}
+	
+	}
+	return s;
 
 }
 
@@ -507,22 +549,14 @@ string ResourceRecord::getNSData(vector<uint8_t>& msgBuff, vector<uint8_t>& data
 	
 	vector<uint8_t> realDomain;
 	vector<uint8_t>::iterator beg = msgBuff.begin();
-	cout << "BUFFER" << endl;
-	for(auto iter = msgBuff.begin(); iter != msgBuff.end(); iter++){
-		cout << (int) *iter << " ";
-	
-	}
-	cout << endl;
+	//cout << "BUFFER" << endl;
+	//for(auto iter = msgBuff.begin(); iter != msgBuff.end(); iter++){
+	//	cout << (int) *iter << " ";
+	//
+	//}
+	//cout << endl;
 	convertBufferNameToVector(beg , beg, msgBuff.end(), realDomain, 0, &data);
-	
-	
-	
-	string s;
-	for(auto iter = realDomain.begin(); iter != realDomain.end(); iter++){
-		s += *iter;
-	
-	}
-	return s;
+	return convertOctetSeqToString(realDomain);
 	
 }
 
