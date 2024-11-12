@@ -186,7 +186,7 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 	vector<pair<string,string> > auths;
 	vector<pair<string,string> > addits;
 	
-	int ret = SessionStates::continued;
+	int ret = (int) SessionStates::continued;
 	while(ret != (int) SessionStates::failed || ret != (int) SessionStates::answered){
 	
 		ret = continueQuery(resp,answers,auths,addits);
@@ -194,7 +194,7 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 		if(ret == (int) SessionStates::answered){
 	
 			cout << "FINAL ANSWERS" << endl;
-			for(auto iter = ips.begin(); iter != ips.end(); iter++){
+			for(auto iter = answers.begin(); iter != answers.end(); iter++){
 				cout << "ip " << *iter << " " << endl;
 		
 			}
@@ -229,6 +229,8 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 	
 	
 	}
+	
+	return (int) SessionStates::failed;
 
 
 
