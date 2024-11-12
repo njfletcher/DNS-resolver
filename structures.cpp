@@ -576,7 +576,7 @@ void ResourceRecord::print(uint16_t number = 0){
 uint32_t ResourceRecord::getInternetData(vector<uint8_t> data){
 
 	if(data.size() < 4) return 0;
-	else return (((uint32_t)data[0]) << 24) |  (((uint32_t)data[1]) << 16) |  (((uint32_t)data[2]) << 8) |  (((uint32_t)data[3]));
+	else return (((uint32_t)data[3]) << 24) |  (((uint32_t)data[2]) << 16) |  (((uint32_t)data[1]) << 8) |  (((uint32_t)data[0]));
 	
 }
 

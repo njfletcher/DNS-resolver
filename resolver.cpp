@@ -176,4 +176,71 @@ int continueQuery(DNSMessage & resp, vector<string>& answerIps, vector<pair <str
 
 } 
 
+int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t id, vector<string>& answers){
+
+
+	shared_ptr<DNSMessage> respPtr = sendStandardQuery(nameServerIp,questionDomainName, id);
+	DNSMessage resp = *respPtr;
+	resp.print();
+	
+	vector<pair<string,string> > auths;
+	vector<pair<string,string> > addits;
+	
+	int ret = SessionStates::continued;
+	while(ret != (int) SessionStates::failed || ret != (int) SessionStates::answered){
+	
+		ret = continueQuery(resp,answers,auths,addits);
+		
+		if(ret == (int) SessionStates::answered){
+	
+			cout << "FINAL ANSWERS" << endl;
+			for(auto iter = ips.begin(); iter != ips.end(); iter++){
+				cout << "ip " << *iter << " " << endl;
+		
+			}
+		
+		}
+		else if (ret == (int) SessionStates::continued){
+	
+			cout << "AUTH CONTINUED" << endl;
+			for(auto iter = auths.begin(); iter != auths.end(); iter++){
+		
+				pair<string,string> p = *iter;
+				cout << "domain " << p.first << " ip " << p.second << endl;
+				if(p.second != ""){
+					int ret = solveStandardQuery(p.second,questionDomainName,id,answers);
+					if(ret == (int) SessionStates::answered){
+						return (int) SessionStates::answered;
+					}
+				
+				}
+		
+			}
+		
+			cout << "ADDIT CONTINUED" << endl;
+			for(auto iter = addits.begin(); iter != addits.end(); iter++){
+		
+				pair<string,string> p = *iter;
+				cout << "domain " << p.first << " ip " << p.second << endl;
+		
+			}
+	
+		}
+	
+	
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+}
+
 

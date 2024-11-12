@@ -21,44 +21,8 @@ int main(int argc, char** argv){
 	
 
 
-	
-	shared_ptr<DNSMessage> respPtr = sendStandardQuery("128.252.0.100",argv[1], 1);
-	DNSMessage resp = *respPtr;
-	resp.print();
-	
 	vector<string> ips;
-	vector<pair<string,string> > auths;
-	vector<pair<string,string> > addits;
-	int ret = continueQuery(resp,ips,auths,addits);
-	
-	if(ret == (int) SessionStates::answered){
-	
-		cout << "FINAL ANSWERS" << endl;
-		for(auto iter = ips.begin(); iter != ips.end(); iter++){
-			cout << "ip " << *iter << " " << endl;
-		
-		}
-		
-	}
-	else if (ret == (int) SessionStates::continued){
-	
-		cout << "AUTH CONTINUED" << endl;
-		for(auto iter = auths.begin(); iter != auths.end(); iter++){
-		
-			pair<string,string> p = *iter;
-			cout << "domain " << p.first << " ip " << p.second << endl;
-		
-		}
-		
-		cout << "ADDIT CONTINUED" << endl;
-		for(auto iter = addits.begin(); iter != addits.end(); iter++){
-		
-			pair<string,string> p = *iter;
-			cout << "domain " << p.first << " ip " << p.second << endl;
-		
-		}
-	
-	}
+	solveStandardQuery("128.252.0.100",argv[1], 1,ips);
 	
 	
 	return 0;
