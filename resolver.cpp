@@ -3,7 +3,6 @@
 #include <fstream>
 #include <string>
 #include <utility>
-#include <list>
 #include <ostream>
 #include <memory>
 #include "structures.h"
@@ -13,12 +12,11 @@
 using namespace std;
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
-shared_ptr< list<pair<string,string>> > readSafetyFile(string filePath){
+void readSafetyFile(string filePath, vector<pair<string,string> >& servers){
 
 	string currLine;
 	size_t delimPos;
 	unsigned int numServers = 0;
-	shared_ptr< list<pair<string,string>> > lPtr = make_shared< list<pair<string,string>> >();
 	
 	ifstream inp(filePath);
 	
@@ -29,7 +27,6 @@ shared_ptr< list<pair<string,string>> > readSafetyFile(string filePath){
 		
 		if(delimPos == string::npos){
 			cout << "Invalid safety belt file format: line is missing semi colon" << endl;
-			return NULL;
 		
 		}
 		else{
@@ -37,23 +34,13 @@ shared_ptr< list<pair<string,string>> > readSafetyFile(string filePath){
 			string ipAddress = currLine.substr(0,delimPos);
 			string domainName = currLine.substr(delimPos+1);
 			pair<string,string> pr(ipAddress, domainName);
-			lPtr->push_back(pr);
+			servers.push_back(pr);
 		
 		}
 
 	
 	}
 	
-	if(numServers == 0){
-		cout << "Invalid safety belt file format: file must have at least one server" << endl;
-		return NULL;
-	}
-	else{
-	
-		return lPtr;
-	}
-
-
 }
 
 
@@ -176,73 +163,136 @@ int continueQuery(DNSMessage & resp, vector<string>& answerIps, vector<pair <str
 
 } 
 
-int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t id, vector<string>& answers){
+int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t id, vector<string>& answers, bool recursive, vector<pair<string,string> >& safety){
 
-
+	
+	cout << "SOLVING NAMESERVER: " << nameServerIp << " QUESTION: " << questionDomainName << endl;
+	
 	shared_ptr<DNSMessage> respPtr = sendStandardQuery(nameServerIp,questionDomainName, id);
 	DNSMessage resp = *respPtr;
 	resp.print();
 	
 	vector<pair<string,string> > auths;
 	vector<pair<string,string> > addits;
-	
-	int ret = (int) SessionStates::continued;
-	while(ret != (int) SessionStates::failed || ret != (int) SessionStates::answered){
-	
-		ret = continueQuery(resp,answers,auths,addits);
+
+	int ret = continueQuery(resp,answers,auths,addits);
 		
-		if(ret == (int) SessionStates::answered){
+	if(ret == (int) SessionStates::answered){
 	
-			cout << "FINAL ANSWERS" << endl;
-			for(auto iter = answers.begin(); iter != answers.end(); iter++){
-				cout << "ip " << *iter << " " << endl;
-		
-			}
+		cout << "FINAL ANSWERS" << endl;
+		for(auto iter = answers.begin(); iter != answers.end(); iter++){
+			cout << "ip " << *iter << " " << endl;
 		
 		}
-		else if (ret == (int) SessionStates::continued){
-	
-			cout << "AUTH CONTINUED" << endl;
-			for(auto iter = auths.begin(); iter != auths.end(); iter++){
+		return (int) SessionStates::answered;
 		
-				pair<string,string> p = *iter;
-				cout << "domain " << p.first << " ip " << p.second << endl;
-				if(p.second != ""){
-					int ret = solveStandardQuery(p.second,questionDomainName,id,answers);
-					if(ret == (int) SessionStates::answered){
-						return (int) SessionStates::answered;
-					}
+	}
+	else if (ret == (int) SessionStates::continued){
+	
+		cout << "AUTH CONTINUED" << endl;
+		for(auto authIter = auths.begin(); authIter != auths.end(); authIter++){
+		
+			pair<string,string> authP = *authIter;
+			string authIp = authP.second;
+			string authName = authP.first;
+			cout << "domain " << authName << " ip " << authIp << endl;
 				
+			/*if(p.second != "" && recursive){
+				int ret = solveStandardQuery(p.second,questionDomainName,id,answers);
+				if(ret == (int) SessionStates::answered){
+					return (int) SessionStates::answered;
 				}
-		
+				
 			}
-		
-			cout << "ADDIT CONTINUED" << endl;
-			for(auto iter = addits.begin(); iter != addits.end(); iter++){
-		
-				pair<string,string> p = *iter;
-				cout << "domain " << p.first << " ip " << p.second << endl;
-		
+			*/
+			bool answerFound = false;
+			for(auto safetyIter = safety.begin(); safetyIter != safety.end() && !answerFound; safetyIter++){
+				
+				pair<string,string> sP = *safetyIter;
+				string sIp = sP.second;
+				string sName = sP.first;
+				
+				if(sName != authName){
+					vector<string> ips;
+					solveStandardQuery(sIp,authName,id,ips,recursive,safety);
+						
+					for(auto conIter = ips.begin(); conIter != ips.end() && !answerFound; conIter++){
+					
+						int contRet = solveStandardQuery(*conIter, questionDomainName,id,answers,recursive,safety);
+						if(contRet == (int) SessionStates::answered) answerFound = true;
+					}
+				}
+				
+				
+				
 			}
-	
+			if(answerFound){
+				return (int) SessionStates::answered;
+			}
+			else return (int) SessionStates::failed;
+				
+				
+		
 		}
-	
+		
+		cout << "ADDIT CONTINUED" << endl;
+		for(auto iter = addits.begin(); iter != addits.end(); iter++){
+		
+			pair<string,string> p = *iter;
+			cout << "domain " << p.first << " ip " << p.second << endl;
+		
+		}
 	
 	}
+
 	
 	return (int) SessionStates::failed;
 
 
+}
 
 
+void verifyRootNameServers(vector<pair<string,string> >& servers){
 
-
-
-
-
+	
+	for(auto iter = servers.begin(); iter != servers.end(); iter++){
+	
+		
+		pair<string,string> questionServer = *iter;
+		string questionIp = questionServer.second;
+		string questionName = questionServer.first;
+		
+		cout << "VERIFYING SERVER: " << questionName << " HAS IP: " << questionIp << endl;
+		
+		for(auto innerIter = servers.begin(); innerIter != servers.end(); innerIter++){
+		
+			pair<string,string> server = *innerIter;
+			string serverIp = server.second;
+			string serverName = server.first;
+			
+			cout << "CONSULTING SERVER: " << serverName << endl;
+			
+			if(serverName != questionName){
+			
+				vector<string> ips;
+				vector<pair<string,string> > safe = {server};
+				solveStandardQuery(serverIp, questionName, 0, ips, true, safe);
+				
+				for(auto aIter = ips.begin(); aIter != ips.end(); aIter++){
+					string ansIp = *aIter;
+					cout << ansIp << endl;
+					if(ansIp == questionIp) cout << "IP VERIFIED" << endl;					
+					
+				
+				}
+			
+			}
+		
+		}
+		
+	}
 
 
 
 }
-
 

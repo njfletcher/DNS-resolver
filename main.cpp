@@ -19,11 +19,10 @@ int main(int argc, char** argv){
 	
 	}
 	
+	vector<pair<string,string> > servers;
+	readSafetyFile(argv[2], servers);
 
-
-	vector<string> ips;
-	solveStandardQuery("128.252.0.100",argv[1], 1,ips);
-	
+	verifyRootNameServers(servers);
 	
 	return 0;
 
