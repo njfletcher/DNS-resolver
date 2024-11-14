@@ -24,6 +24,30 @@ int main(int argc, char** argv){
 
 	verifyRootNameServers(servers);
 	
+	string startIp = "";
+	for(auto iter = servers.begin(); iter < servers.end(); iter++){
+		pair<string,string> p = *iter;
+		if(p.first != ""){
+			startIp = p.first;
+			break;
+		}
+	
+	}
+	
+	vector<string> ans;
+	if(startIp != ""){
+		solveStandardQuery(startIp, argv[1], 0, ans, true, servers);
+		cout << "ANSWERS+++++++++++++++++++++++++++++++++++++++++++++++=" << endl;
+		for(auto iter = ans.begin(); iter < ans.end(); iter++){
+			cout << *iter <<endl;
+		
+		}
+	}
+	else{
+		cout << "no valid start points for query" << endl;
+	}
+	
+	
 	return 0;
 
 

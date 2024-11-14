@@ -54,13 +54,13 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	uint8_t* msgArr = &msg[0];
 	msgArr[0] = ((sz -2) & 0xff00) >> 7;
 	msgArr[1] = ((sz -2) & 0x00ff);
-	cout << "MY MESSAGE START=============================================" << endl;
+	/*cout << "MY MESSAGE START=============================================" << endl;
 	for(size_t i =0; i < sz; i++){
 		cout << (unsigned int)msgArr[i] << " ";
 	}
 	cout << endl;
 	cout << "MY MESSAGE END=============================================" << endl;
-	
+	*/
 	
 	
 	if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0){
@@ -70,7 +70,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 	int bytesSent = send(clientSocket, msgArr, sz, 0);
 	
-	cout << "sent bytes " << bytesSent << endl;
+	//cout << "sent bytes " << bytesSent << endl;
 	if(bytesSent < 1){
 		perror("cant send message\n");
 		close(clientSocket);
@@ -83,14 +83,14 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	socklen_t outSize;
 	int bytesRec = recv(clientSocket, buffer, sizeof(buffer), 0);
 	
-	cout << bytesRec << endl;
+	//cout << bytesRec << endl;
 	if(bytesRec < 1){
 		cout << "failed to read message from server" << endl;
 		close(clientSocket);
 		return (int)NetworkErrors::recieving;
 	}
 	
-	cout <<endl;
+	/*cout <<endl;
 	cout << "SERVER MESSAGE START=============================================" << endl;
 	for(int i =0; i < 2000; i++){
 	
@@ -98,6 +98,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 	}
 	cout << "SERVER MESSAGE END=============================================" << endl;
+	*/
 	
 	close(clientSocket);
 	resp = vector<uint8_t>(buffer,buffer + (responseSize * sizeof(uint8_t)));

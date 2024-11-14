@@ -45,7 +45,7 @@ void readSafetyFile(string filePath, vector<pair<string,string> >& servers){
 
 
 
-shared_ptr<DNSMessage> sendStandardQuery(string nameServerIp, string questionDomainName, uint16_t id){
+shared_ptr<DNSMessage> sendStandardQuery(string nameServerIp, string questionDomainName, uint16_t id, int& result){
 
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
 	DNSHeader hdr(id, flg, 1, 0, 0,0);
@@ -56,8 +56,8 @@ shared_ptr<DNSMessage> sendStandardQuery(string nameServerIp, string questionDom
 	vector<uint8_t> buff;
 	vector<uint8_t> resp;
 	msg.toBuffer(buff);
-	msg.print();
-	sendMessageResolverClient(nameServerIp, buff, resp);
+	//msg.print();
+	result = sendMessageResolverClient(nameServerIp, buff, resp);
 	auto iter = resp.begin();
 	return make_shared<DNSMessage>(iter, iter, resp.end());
 
@@ -117,7 +117,7 @@ int continueQuery(DNSMessage & resp, vector<string>& answerIps, vector<pair <str
 			ResourceRecord r = resp._authority[i];
 			if( r._rType == (uint8_t)ResourceTypes::ns){
 				string domain = ResourceRecord::getNSData(msgBuff, r._rData);
-				pair<string, string> p(domain,"");
+				pair<string, string> p("",domain);
 				authMaps.push_back(p);
 			}
 		
@@ -138,15 +138,15 @@ int continueQuery(DNSMessage & resp, vector<string>& answerIps, vector<pair <str
 				bool matched = false;
 				for(auto iter = authMaps.begin(); iter != authMaps.end(); iter++){
 					pair<string, string>& p = *iter;
-					if(p.first == name){
-						p.second = convertIpIntToString(ip);
+					if(p.second == name){
+						p.first = convertIpIntToString(ip);
 						matched = true;
 						break;
 					}
 				
 				}
 				if(!matched){
-					pair<string, string > p(name,convertIpIntToString(ip));
+					pair<string, string > p(convertIpIntToString(ip), name);
 					additMaps.push_back(p);
 				}
 			}
@@ -168,9 +168,16 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 	
 	cout << "SOLVING NAMESERVER: " << nameServerIp << " QUESTION: " << questionDomainName << endl;
 	
-	shared_ptr<DNSMessage> respPtr = sendStandardQuery(nameServerIp,questionDomainName, id);
+	int netErr;
+	shared_ptr<DNSMessage> respPtr = sendStandardQuery(nameServerIp,questionDomainName, id, netErr);
+	
+	if(netErr != (int)NetworkErrors::none){
+		return (int) SessionStates::failed;
+	
+	}
+	
 	DNSMessage resp = *respPtr;
-	resp.print();
+	//resp.print();
 	
 	vector<pair<string,string> > auths;
 	vector<pair<string,string> > addits;
@@ -193,8 +200,8 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 		for(auto authIter = auths.begin(); authIter != auths.end(); authIter++){
 		
 			pair<string,string> authP = *authIter;
-			string authIp = authP.second;
-			string authName = authP.first;
+			string authIp = authP.first;
+			string authName = authP.second;
 			cout << "domain " << authName << " ip " << authIp << endl;
 				
 			/*if(p.second != "" && recursive){
@@ -209,8 +216,8 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 			for(auto safetyIter = safety.begin(); safetyIter != safety.end() && !answerFound; safetyIter++){
 				
 				pair<string,string> sP = *safetyIter;
-				string sIp = sP.second;
-				string sName = sP.first;
+				string sIp = sP.first;
+				string sName = sP.second;
 				
 				if(sName != authName){
 					vector<string> ips;
@@ -239,12 +246,15 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 		for(auto iter = addits.begin(); iter != addits.end(); iter++){
 		
 			pair<string,string> p = *iter;
-			cout << "domain " << p.first << " ip " << p.second << endl;
+			cout << "domain " << p.second << " ip " << p.first << endl;
 		
 		}
 	
 	}
-
+	else{
+		return (int) SessionStates::failed;
+	
+	}
 	
 	return (int) SessionStates::failed;
 
@@ -259,34 +269,42 @@ void verifyRootNameServers(vector<pair<string,string> >& servers){
 	
 		
 		pair<string,string> questionServer = *iter;
-		string questionIp = questionServer.second;
-		string questionName = questionServer.first;
+		string questionIp = questionServer.first;
+		string questionName = questionServer.second;
 		
 		cout << "VERIFYING SERVER: " << questionName << " HAS IP: " << questionIp << endl;
 		
-		for(auto innerIter = servers.begin(); innerIter != servers.end(); innerIter++){
+		bool verified = false;
+		for(auto innerIter = servers.begin(); innerIter != servers.end() && !verified; innerIter++){
 		
 			pair<string,string> server = *innerIter;
-			string serverIp = server.second;
-			string serverName = server.first;
-			
-			cout << "CONSULTING SERVER: " << serverName << endl;
+			string serverIp = server.first;
+			string serverName = server.second;
 			
 			if(serverName != questionName){
+			
+				cout << "CONSULTING SERVER: " << serverName << endl;
 			
 				vector<string> ips;
 				vector<pair<string,string> > safe = {server};
 				solveStandardQuery(serverIp, questionName, 0, ips, true, safe);
 				
-				for(auto aIter = ips.begin(); aIter != ips.end(); aIter++){
+				for(auto aIter = ips.begin(); aIter != ips.end() && !verified; aIter++){
 					string ansIp = *aIter;
 					cout << ansIp << endl;
-					if(ansIp == questionIp) cout << "IP VERIFIED" << endl;					
+					if(ansIp == questionIp){
+						cout << "IP VERIFIED" << endl;
+						verified = true;
+					}					
 					
 				
 				}
 			
 			}
+		
+		}
+		if(!verified){
+			cout << "root server ip not verified, consider updating it." << endl;
 		
 		}
 		

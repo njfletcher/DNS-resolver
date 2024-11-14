@@ -73,10 +73,10 @@ enum class ResponseCodes{
 
 };
 
-void readSafetyFile(std::string filePath, std::vector<std::pair<std::string,std::string> > servers);
-std::shared_ptr<DNSMessage> sendStandardQuery(std::string nameServerIp, std::string questionDomainName, uint16_t id);
+void readSafetyFile(std::string filePath, std::vector<std::pair<std::string,std::string> >& servers);
+std::shared_ptr<DNSMessage> sendStandardQuery(std::string nameServerIp, std::string questionDomainName, uint16_t id, int& result);
 int continueQuery(DNSMessage & resp, std::vector<std::string>& answerIps, std::vector<std::pair<std::string, std::string> >& authMaps, std::vector<std::pair<std::string, std::string> >& additMaps);
-int solveStandardQuery(std::string nameServerIp, std::string questionDomainName, uint16_t id, std::vector<std::string>& answers, bool recursive, std::vector<std::pair<std::string,std::string> > safety);
+int solveStandardQuery(std::string nameServerIp, std::string questionDomainName, uint16_t id, std::vector<std::string>& answers, bool recursive, std::vector<std::pair<std::string,std::string> >& safety);
 void verifyRootNameServers(std::vector<std::pair<std::string,std::string> >& servers);
 
 
