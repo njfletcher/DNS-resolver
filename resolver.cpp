@@ -82,11 +82,14 @@ int continueQuery(DNSMessage & resp, vector<string>& answerIps, vector<pair <str
 	vector<uint8_t> msgBuff;
 	resp.toBuffer(msgBuff);
 	if(resp._hdr._flags._qr != (uint8_t) qrVals::response){
+	
 		return (int) SessionStates::failed;
 	
 	}
 	
-	if(resp._hdr._flags._rcode != (uint8_t) ResponseCodes::none){
+	uint8_t respCode = resp._hdr._flags._rcode;
+	if(respCode != (uint8_t) ResponseCodes::none){
+	
 		return (int) SessionStates::failed;
 	
 	}
@@ -204,14 +207,14 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 			string authName = authP.second;
 			cout << "domain " << authName << " ip " << authIp << endl;
 				
-			/*if(p.second != "" && recursive){
-				int ret = solveStandardQuery(p.second,questionDomainName,id,answers);
+			if(authIp != "" && recursive){
+				int ret = solveStandardQuery(authIp,questionDomainName,id,answers,true,safety);
 				if(ret == (int) SessionStates::answered){
 					return (int) SessionStates::answered;
 				}
 				
 			}
-			*/
+			
 			bool answerFound = false;
 			for(auto safetyIter = safety.begin(); safetyIter != safety.end() && !answerFound; safetyIter++){
 				

@@ -7,6 +7,9 @@
 #include "structures.h"
 #include <vector>
 
+#define perRequestOpCap 10
+#define perSequenceOpCap 50
+
 enum class SessionStates{
 
 	answered = 0,
@@ -70,6 +73,41 @@ enum class ResponseCodes{
 	implement = 4, //The name server does not support the requested kind of query
 	refused = 5 //The name server refuses to perform the specified operation for policy reasons.  For example, 
 	//a name server may not wish to provide the information to the particular requester, or a name server may not wish to perform a particular operation (e.g., zone transfer) for particular data
+
+};
+
+
+struct NameServerInfo{
+
+	std::string name;
+	std::string address;
+	int score;
+};
+
+struct SList{
+
+	uint16_t matchCount;
+	std::vector<struct NameServerInfo> nS;	
+};
+
+struct queryState{
+
+	//id of the original query
+	uint16_t id;
+	//name queried
+	std::string sname;
+	//qtype of request
+	uint16_t stype;
+	//qclass of request
+	uint16_t sclass;
+	//name servers this request thinks will be helpful
+	struct SList servs;
+	//number of operations left for this specific request until failure
+	int numOpsLeftLocal;
+	//number of operations left for the series of requests that led to this one until failure
+	int numOpsLeftGlobal;
+	//absolute time the request started
+	uint16_t startTime;
 
 };
 
