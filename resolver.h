@@ -10,6 +10,7 @@
 #define perRequestOpCap 10
 #define perSequenceOpCap 50
 
+
 enum class SessionStates{
 
 	answered = 0,
@@ -77,44 +78,54 @@ enum class ResponseCodes{
 };
 
 
-struct NameServerInfo{
+class NameServerInfo{
 
-	std::string name;
-	std::string address;
-	int score;
+	public:
+		std::string _name;
+		std::string _address;
+		int _score;
+		NameServerInfo(std::string name, std::string address, int score);
 };
 
-struct SList{
+class SList{
 
-	uint16_t matchCount;
-	std::vector<struct NameServerInfo> nS;	
+	public:
+		uint16_t _matchCount;
+		std::vector<struct NameServerInfo> _servers;
+		SList();	
 };
 
-struct queryState{
+class QueryState{
 
-	//id of the original query
-	uint16_t id;
-	//name queried
-	std::string sname;
-	//qtype of request
-	uint16_t stype;
-	//qclass of request
-	uint16_t sclass;
-	//name servers this request thinks will be helpful
-	struct SList servs;
-	//number of operations left for this specific request until failure
-	int numOpsLeftLocal;
-	//number of operations left for the series of requests that led to this one until failure
-	int numOpsLeftGlobal;
-	//absolute time the request started
-	uint16_t startTime;
+	public:
+		//id of the original query
+		uint16_t _id;
+		//name queried
+		std::string _sname;
+		//qtype of request
+		uint16_t _stype;
+		//qclass of request
+		uint16_t _sclass;
+		//name servers this request thinks will be helpful
+		struct SList _servs;
+		//number of operations left for this specific request until failure
+		int _numOpsLeftLocal;
+		//number of operations left for the series of requests that led to this one until failure
+		int _numOpsLeftGlobal;
+		//absolute time the request started
+		uint16_t _startTime;
+		
+		int _networkCode;
+		std::shared_ptr<DNSMessage> _lastResponse;
+		
+		QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass, int networkCode);
 
 };
 
 void readSafetyFile(std::string filePath, std::vector<std::pair<std::string,std::string> >& servers);
-std::shared_ptr<DNSMessage> sendStandardQuery(std::string nameServerIp, std::string questionDomainName, uint16_t id, int& result);
+std::shared_ptr<QueryState> sendStandardQuery(std::string nameServerIp, std::string questionDomainName, bool& failed);
 int continueQuery(DNSMessage & resp, std::vector<std::string>& answerIps, std::vector<std::pair<std::string, std::string> >& authMaps, std::vector<std::pair<std::string, std::string> >& additMaps);
-int solveStandardQuery(std::string nameServerIp, std::string questionDomainName, uint16_t id, std::vector<std::string>& answers, bool recursive, std::vector<std::pair<std::string,std::string> >& safety);
+int solveStandardQuery(std::string nameServerIp, std::string questionDomainName, std::vector<std::string>& answers, bool recursive, std::vector<std::pair<std::string,std::string> >& safety);
 void verifyRootNameServers(std::vector<std::pair<std::string,std::string> >& servers);
 
 

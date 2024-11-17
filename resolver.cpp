@@ -11,6 +11,14 @@
 #include <arpa/inet.h>
 using namespace std;
 
+std::vector<uint16_t> takenIds;
+
+
+QueryState::QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass, int networkCode): _id(id), _sname(sname), _stype(stype), _sclass(sclass), _networkCode(networkCode) {};
+NameServerInfo::NameServerInfo(string name, string address, int score): _name(name), _address(address), _score(score) {};
+SList::SList(){};
+
+
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
 void readSafetyFile(string filePath, vector<pair<string,string> >& servers){
 
@@ -43,26 +51,6 @@ void readSafetyFile(string filePath, vector<pair<string,string> >& servers){
 	
 }
 
-
-
-shared_ptr<DNSMessage> sendStandardQuery(string nameServerIp, string questionDomainName, uint16_t id, int& result){
-
-	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
-	DNSHeader hdr(id, flg, 1, 0, 0,0);
-	QuestionRecord q(questionDomainName.c_str(), (uint16_t)ResourceTypes::a, (uint16_t)ResourceClasses::in);
-	vector<QuestionRecord> qr = {q};
-	vector<ResourceRecord> rr;
-	DNSMessage msg(hdr, qr, rr, rr, rr );
-	vector<uint8_t> buff;
-	vector<uint8_t> resp;
-	msg.toBuffer(buff);
-	//msg.print();
-	result = sendMessageResolverClient(nameServerIp, buff, resp);
-	auto iter = resp.begin();
-	return make_shared<DNSMessage>(iter, iter, resp.end());
-
-}
-
 string convertIpIntToString(uint32_t ip){
 
 	char buffer[INET_ADDRSTRLEN];
@@ -76,6 +64,69 @@ string convertIpIntToString(uint32_t ip){
 	return s;
 
 }
+
+uint16_t pickNextId(){
+	
+	uint16_t max = 0;
+	for(auto iter = takenIds.begin(); iter < takenIds.end(); iter++){
+		if(*iter > max) max = *iter;
+	
+	}
+	return max + 1;
+
+}
+
+void reclaimId(uint16_t id){
+	
+	auto iter = takenIds.begin();
+	bool found = false
+	for(; iter < takenIds.end(); iter++){
+		if(*iter == id){
+			found = true;
+			break;
+		{
+	
+	}
+	
+	if(found){
+		takenIds.erase(iter);
+	}
+
+}
+
+
+
+shared_ptr<QueryState> sendStandardQuery(string nameServerIp, string questionDomainName, bool& failed){
+
+	uint16_t id = pickNextId();
+	
+	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
+	DNSHeader hdr(id, flg, 1, 0, 0,0);
+	QuestionRecord q(questionDomainName.c_str(), (uint16_t)ResourceTypes::a, (uint16_t)ResourceClasses::in);
+	vector<QuestionRecord> qr = {q};
+	vector<ResourceRecord> rr;
+	DNSMessage msg(hdr, qr, rr, rr, rr );
+	vector<uint8_t> buff;
+	vector<uint8_t> resp;
+	msg.toBuffer(buff);
+	//msg.print();
+	int networkResult = sendMessageResolverClient(nameServerIp, buff, resp);
+	shared_ptr<QueryState> state = make_shared<QueryState>(id, questionDomainName, (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in, networkResult);
+	
+	if(networkResult == (int) NetworkCodes::none){
+		auto iter = resp.begin();
+		state->_lastResponse = make_shared<DNSMessage>(iter, iter, resp.end());
+	
+	}
+	else{
+		//no point in using this id further, just need to make sure calling code doesnt try to send more network requests with this id(unless it gets chosen again).
+		reclaimId(id);
+	}
+	
+	return state;
+
+}
+
 
 int continueQuery(DNSMessage & resp, vector<string>& answerIps, vector<pair <string, string> >& authMaps, vector<pair <string, string> >& additMaps){
 
@@ -166,13 +217,13 @@ int continueQuery(DNSMessage & resp, vector<string>& answerIps, vector<pair <str
 
 } 
 
-int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t id, vector<string>& answers, bool recursive, vector<pair<string,string> >& safety){
+int solveStandardQuery(string nameServerIp, string questionDomainName, vector<string>& answers, bool recursive, vector<pair<string,string> >& safety){
 
 	
 	cout << "SOLVING NAMESERVER: " << nameServerIp << " QUESTION: " << questionDomainName << endl;
 	
 	int netErr;
-	shared_ptr<DNSMessage> respPtr = sendStandardQuery(nameServerIp,questionDomainName, id, netErr);
+	shared_ptr<DNSMessage> respPtr = sendStandardQuery(nameServerIp,questionDomainName, netErr);
 	
 	if(netErr != (int)NetworkErrors::none){
 		return (int) SessionStates::failed;
@@ -208,7 +259,7 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 			cout << "domain " << authName << " ip " << authIp << endl;
 				
 			if(authIp != "" && recursive){
-				int ret = solveStandardQuery(authIp,questionDomainName,id,answers,true,safety);
+				int ret = solveStandardQuery(authIp,questionDomainName, answers,true,safety);
 				if(ret == (int) SessionStates::answered){
 					return (int) SessionStates::answered;
 				}
@@ -228,7 +279,7 @@ int solveStandardQuery(string nameServerIp, string questionDomainName, uint16_t 
 						
 					for(auto conIter = ips.begin(); conIter != ips.end() && !answerFound; conIter++){
 					
-						int contRet = solveStandardQuery(*conIter, questionDomainName,id,answers,recursive,safety);
+						int contRet = solveStandardQuery(*conIter, questionDomainName, answers,recursive,safety);
 						if(contRet == (int) SessionStates::answered) answerFound = true;
 					}
 				}
