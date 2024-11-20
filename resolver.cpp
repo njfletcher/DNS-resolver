@@ -9,15 +9,21 @@
 #include <vector>
 #include "network.h"
 #include <arpa/inet.h>
+#include <unordered_map>
+#include <list>
+
 using namespace std;
 
 vector<uint16_t> takenIds;
 vector<pair<string,string> > safety;
+//maps domain name to valid resource records
+unordered_map<string, list<ResourceRecord> > cache;
 
 
 QueryState::QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass, int networkCode): _id(id), _sname(sname), _stype(stype), _sclass(sclass), _networkCode(networkCode) {};
 NameServerInfo::NameServerInfo(string name, string address, int score): _name(name), _address(address), _score(score) {};
 SList::SList(): _matchCount(0) {};
+
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
 void loadSafeties(string filePath){
@@ -94,6 +100,36 @@ void reclaimId(uint16_t id){
 
 }
 
+void insertRecordIntoCache(ResourceRecord& r){
+
+	if(r._ttl > 0){
+		list<ResourceRecord>& records = cache[convertOctetSeqToString(r._name)];
+		records.push_back(r);
+	}
+
+}
+
+list<ResourceRecord> getRecordsFromCache(string domainName){
+
+	
+	if(cach.find(domainName) != cache.end()){
+		list<ResourceRecord>& records = cache[convertOctetSeqToString(r._name)];
+		for(auto iter = records.begin(); iter < records.end(); iter++){
+			ResourceRecord r = *iter;
+			if(r._cacheExpireTime < time(NULL)){
+				records.erase(iter);
+			}
+		
+		}
+		
+		return records;
+	
+	}
+	else{
+		return list<ResourceRecord>();
+	}
+
+}
 
 
 shared_ptr<QueryState> sendStandardQuery(string nameServerIp, string questionDomainName){
@@ -185,7 +221,10 @@ int QueryState::extractDataFromResponse(){
 			if( r._rType == (uint8_t)ResourceTypes::a){
 			
 				uint32_t ip = ResourceRecord::getInternetData(r._rData);
-				if(ip > 0) answerIps.push_back(convertIpIntToString(ip));
+				if(ip > 0) {
+					answerIps.push_back(convertIpIntToString(ip));
+					insertRecordIntoCache(r);
+				}
 			
 			}
 		
@@ -204,6 +243,7 @@ int QueryState::extractDataFromResponse(){
 				string domain = ResourceRecord::getNSData(msgBuff, r._rData);
 				pair<string, string> p("",domain);
 				authMaps.push_back(p);
+				insertRecordIntoCache(r);
 			}
 		
 		}
@@ -214,12 +254,13 @@ int QueryState::extractDataFromResponse(){
 	size_t numAdditActual = resp._additional.size();
 	if(numAdditClaim > 0){
 		
-		//matching recieved a records in addit to domain names in auth section. this should be handled by cache later.
 		for(size_t i =0; i < numAdditActual; i++){
 			ResourceRecord r = resp._additional[i];
 			if( r._rType == (uint8_t)ResourceTypes::a){
 			
-				string name = convertOctetSeqToString(r._name);
+				insertRecordIntoCache(r);
+				
+				/*string name = convertOctetSeqToString(r._name);
 				uint32_t ip = ResourceRecord::getInternetData(r._rData);
 				bool matched = false;
 				for(auto iter = authMaps.begin(); iter != authMaps.end(); iter++){
@@ -235,6 +276,7 @@ int QueryState::extractDataFromResponse(){
 					pair<string, string > p(convertIpIntToString(ip), name);
 					additMaps.push_back(p);
 				}
+				*/
 			}
 		
 		}

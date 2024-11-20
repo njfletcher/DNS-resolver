@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <iterator>
+#include <ctime>
 
 #define maxDomainNameLen 255
 
@@ -75,7 +76,8 @@ class ResourceRecord{
 		std::vector<uint8_t> _name; // a sequence of octets that repeats the pattern: length octet = n, n octets 
 		uint16_t _rType;
 		uint16_t _rClass;
-		uint32_t _ttl;
+		uint32_t _ttl; //relative time to live given by server
+		std::time_t _cacheExpireTime; //absolute expiration time used by cache
 		uint16_t _rdLength; //specified in octets
 		std::vector<uint8_t> _rData; //length of rdLength, not null terminated
 		

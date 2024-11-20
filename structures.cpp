@@ -5,6 +5,7 @@
 #include <iterator>
 #include <bitset>
 #include "resolver.h"
+#include <ctime>
 
 using namespace std;
 
@@ -492,6 +493,7 @@ ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClas
 
 	_rData = rData;
 	convertCStringToOctetForm(name, _name);
+	_cacheExpireTime = time(NULL) + _ttl;
 
 }
 
