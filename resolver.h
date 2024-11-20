@@ -6,6 +6,7 @@
 #include <memory>
 #include "structures.h"
 #include <vector>
+#include <ctime>
 
 #define perRequestOpCap 10
 #define perSequenceOpCap 50
@@ -115,13 +116,14 @@ class QueryState{
 		//absolute time the request started
 		uint16_t _startTime;
 		//answers received for this query
-		vector<std::string>_answers;
+		vector<std::string> _answers;
 		
 		int _networkCode;
 		std::shared_ptr<DNSMessage> _lastResponse;
 		
-		QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass, int networkCode);
+		QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass);
 		int extractDataFromResponse();
+		void cacheRecords();
 		
 	private:
 		int checkForResponseErrors();

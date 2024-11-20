@@ -20,9 +20,13 @@ vector<pair<string,string> > safety;
 unordered_map<string, list<ResourceRecord> > cache;
 
 
-QueryState::QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass, int networkCode): _id(id), _sname(sname), _stype(stype), _sclass(sclass), _networkCode(networkCode) {};
-NameServerInfo::NameServerInfo(string name, string address, int score): _name(name), _address(address), _score(score) {};
-SList::SList(): _matchCount(0) {};
+QueryState::QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass): _id(id), _sname(sname), _stype(stype), _sclass(sclass), _networkCode(NetworkErrors::none) {
+
+	_startTime = time(NULL);
+}
+
+NameServerInfo::NameServerInfo(string name, string address, int score): _name(name), _address(address), _score(score) {}
+SList::SList(): _matchCount(0) {}
 
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
@@ -102,6 +106,7 @@ void reclaimId(uint16_t id){
 
 void insertRecordIntoCache(ResourceRecord& r){
 
+	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
 	if(r._ttl > 0){
 		list<ResourceRecord>& records = cache[convertOctetSeqToString(r._name)];
 		records.push_back(r);
@@ -132,13 +137,43 @@ list<ResourceRecord> getRecordsFromCache(string domainName){
 }
 
 
-shared_ptr<QueryState> sendStandardQuery(string nameServerIp, string questionDomainName){
+//assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
+QueryState::cacheRecords(){
 
-	uint16_t id = pickNextId();
+	for(auto iter = _lastResponse->_answer.begin(); iter < _lastResponse->_answer.end(); iter++){
 	
+		ResourceRecord& r = *iter;
+		r._cacheExpireTime = _startTime + r._ttl;
+		insertRecordIntoCache(r);
+	
+	}
+	
+	for(auto iter = _lastResponse->_authority.begin(); iter < _lastResponse->_authority.end(); iter++){
+	
+		ResourceRecord& r = *iter;
+		r._cacheExpireTime = _startTime + r._ttl;
+		insertRecordIntoCache(r);
+	
+	}
+	
+	for(auto iter = _lastResponse->_additional.begin(); iter < _lastResponse->_additional.end(); iter++){
+	
+		ResourceRecord& r = *iter;
+		r._cacheExpireTime = _startTime + r._ttl;
+		insertRecordIntoCache(r);
+	
+	}
+	
+
+}
+
+
+void sendStandardQuery(string nameServerIp, shared_ptr<QueryState>& state){
+
+
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
 	DNSHeader hdr(id, flg, 1, 0, 0,0);
-	QuestionRecord q(questionDomainName.c_str(), (uint16_t)ResourceTypes::a, (uint16_t)ResourceClasses::in);
+	QuestionRecord q(state._sname.c_str(), state._stype , state._sclass );
 	
 	vector<QuestionRecord> qr = {q};
 	vector<ResourceRecord> rr;
@@ -149,19 +184,12 @@ shared_ptr<QueryState> sendStandardQuery(string nameServerIp, string questionDom
 	msg.toBuffer(buff);
 
 	int networkResult = sendMessageResolverClient(nameServerIp, buff, resp);
-	shared_ptr<QueryState> state = make_shared<QueryState>(id, questionDomainName, (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in, networkResult);
 	
 	if(networkResult == (int) NetworkCodes::none){
 		auto iter = resp.begin();
 		state->_lastResponse = make_shared<DNSMessage>(iter, iter, resp.end());
 	
 	}
-	else{
-		//no point in using this id further, just need to make sure calling code doesnt try to send more network requests with this id(unless it gets chosen again).
-		reclaimId(id);
-	}
-	
-	return state;
 
 }
 
@@ -206,7 +234,7 @@ int QueryState::extractDataFromResponse(){
 
 
 	if(checkForResponseErrors()) return (int) SessionStates::failed;
-	
+	else cacheRecords();
 	
 	vector<uint8_t> msgBuff;
 	_lastResponse.toBuffer(msgBuff);
@@ -218,14 +246,10 @@ int QueryState::extractDataFromResponse(){
 		
 		for(size_t i =0; i < numAnswersActual; i++){
 			ResourceRecord r = resp._answer[i];
-			if( r._rType == (uint8_t)ResourceTypes::a){
+			if( r._rType == (uint16_t)ResourceTypes::a){
 			
 				uint32_t ip = ResourceRecord::getInternetData(r._rData);
-				if(ip > 0) {
-					answerIps.push_back(convertIpIntToString(ip));
-					insertRecordIntoCache(r);
-				}
-			
+				if(ip > 0) answerIps.push_back(convertIpIntToString(ip));
 			}
 		
 		}
@@ -239,18 +263,17 @@ int QueryState::extractDataFromResponse(){
 		
 		for(size_t i =0; i < numAuthActual; i++){
 			ResourceRecord r = resp._authority[i];
-			if( r._rType == (uint8_t)ResourceTypes::ns){
+			if( r._rType == (uint16_t)ResourceTypes::ns){
 				string domain = ResourceRecord::getNSData(msgBuff, r._rData);
 				pair<string, string> p("",domain);
 				authMaps.push_back(p);
-				insertRecordIntoCache(r);
 			}
 		
 		}
 	
 	}
 	
-	uint16_t numAdditClaim = resp._hdr._numAdditRR;
+	/*uint16_t numAdditClaim = resp._hdr._numAdditRR;
 	size_t numAdditActual = resp._additional.size();
 	if(numAdditClaim > 0){
 		
@@ -258,32 +281,13 @@ int QueryState::extractDataFromResponse(){
 			ResourceRecord r = resp._additional[i];
 			if( r._rType == (uint8_t)ResourceTypes::a){
 			
-				insertRecordIntoCache(r);
-				
-				/*string name = convertOctetSeqToString(r._name);
-				uint32_t ip = ResourceRecord::getInternetData(r._rData);
-				bool matched = false;
-				for(auto iter = authMaps.begin(); iter != authMaps.end(); iter++){
-					pair<string, string>& p = *iter;
-					if(p.second == name){
-						p.first = convertIpIntToString(ip);
-						matched = true;
-						break;
-					}
-				
-				}
-				if(!matched){
-					pair<string, string > p(convertIpIntToString(ip), name);
-					additMaps.push_back(p);
-				}
-				*/
 			}
 		
 		}
 		
 		return SessionStates::continued;
 	
-	}
+	}*/
 	
 	
 	
@@ -317,10 +321,126 @@ shared_ptr<QueryState> solveSubQuery(string leadName){
 
 }
 
+void splitDomainName(string domainName, vector<string>& splits){
+	
+	
+	bool labelsLeft = true;
+
+	while(labelsLeft){
+		
+		size_t ind = domainName.find(".");
+		if(ind == string::npos){
+			labelsLeft = false;
+			splits.push_back(domainName);
+		}
+		else{
+			splits.push_back(domainName.substr(0,ind));
+			domainName = domainName.substr(ind + 1);
+		
+		}
+		
+	}
+	
+	//needs one last split for the root
+	splits.push_back("");
+
+
+}
+
 shared_ptr<QueryState> solveStandardQuery(string nameServerIp, string questionDomainName){
 
 	
 	cout << "SOLVING NAMESERVER: " << nameServerIp << " QUESTION: " << questionDomainName << endl;
+	
+	uint16_t id = pickNextId();
+	
+	shared_ptr<QueryState> state = make_shared<QueryState>(id, questionDomainName, (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in, networkResult);
+	
+	list<ResourceRecords> directCached = getRecordsFromCache(questionDomainName);
+	
+	for(auto iter = directCached.begin(); iter < directCached.end(); iter++){
+	
+		ResourceRecord r = *iter;
+		if(r._rType == (uint16_t) ResourceTypes::a){
+			uint32_t ip = ResourceRecord::getInternetData(r._rData);
+			state->_answers.push_back(convertIpIntToString(ip));
+		
+		}	
+	}
+	
+	if(state._answers.size() > 0){
+	
+		reclaimId(state->_id);
+		return state;
+	
+	}
+	
+	
+	
+	vector<string> splits;
+	splitDomainName(questionDomainName, splits);
+	
+	for(size_t i = 0; i < splits.size(); i++){
+		
+		string currDomain;
+		for(size_t j = i; j < splits.size(); j++){
+			
+			currDomain += splits[j];
+			if(j != splits.size() - 1){
+				currDomain += ".";
+			}
+			//root
+			else if(j == i) currDomain += ".";
+		
+		}
+		
+		
+		list<ResourceRecords> indirectCached = getRecordsFromCache(currDomain);
+	
+		for(auto iter = directCached.begin(); iter < directCached.end(); iter++){
+	
+			ResourceRecord r = *iter;
+			if(r._rType == (uint16_t) ResourceTypes::ns){
+				string domain = ResourceRecord::getNSData(msgBuff, r._rData);
+				if(ip > 0) state->_answers.push_back(convertIpIntToString(ip));
+		
+			}
+	
+	
+		}
+	
+	}
+	
+	
+	
+	
+	
+	if(state._answers.size() > 0){
+	
+		reclaimId(state->_id);
+		return state;
+	
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	shared_ptr<QueryState> queryState = sendStandardQuery(nameServerIp,questionDomainName);
 	SessionStates initialReturn = queryState.extractDataFromResponse();

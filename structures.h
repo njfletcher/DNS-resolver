@@ -94,6 +94,21 @@ class ResourceRecord{
 
 };
 
+class NSResourceRecord : public ResourceRecord{
+
+	public:
+		std::string _answerDomainName;
+
+
+}
+
+class AResourceRecord : public ResourceRecord{
+
+	public:
+		uint32_t _ipAnswer;
+
+}
+
 
 
 class DNSMessage{
