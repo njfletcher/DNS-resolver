@@ -114,18 +114,24 @@ class QueryState{
 		int _numOpsLeftGlobal;
 		//absolute time the request started
 		uint16_t _startTime;
+		//answers received for this query
+		vector<std::string>_answers;
 		
 		int _networkCode;
 		std::shared_ptr<DNSMessage> _lastResponse;
 		
 		QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass, int networkCode);
+		int extractDataFromResponse();
+		
+	private:
+		int checkForResponseErrors();
+		
+		
 
 };
 
-void readSafetyFile(std::string filePath, std::vector<std::pair<std::string,std::string> >& servers);
-std::shared_ptr<QueryState> sendStandardQuery(std::string nameServerIp, std::string questionDomainName, bool& failed);
-int continueQuery(DNSMessage & resp, std::vector<std::string>& answerIps, std::vector<std::pair<std::string, std::string> >& authMaps, std::vector<std::pair<std::string, std::string> >& additMaps);
-int solveStandardQuery(std::string nameServerIp, std::string questionDomainName, std::vector<std::string>& answers, bool recursive, std::vector<std::pair<std::string,std::string> >& safety);
+void loadSafeties(std::string filePath);
+int solveStandardQuery(std::string nameServerIp, std::string questionDomainName);
 void verifyRootNameServers(std::vector<std::pair<std::string,std::string> >& servers);
 
 
