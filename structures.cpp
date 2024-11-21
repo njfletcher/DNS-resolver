@@ -524,6 +524,7 @@ ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uin
 		_rData.push_back(*iter);
 		iter = iter + 1;
 	}
+	
 
 }
 

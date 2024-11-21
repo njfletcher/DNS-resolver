@@ -80,7 +80,7 @@ class ResourceRecord{
 		std::time_t _cacheExpireTime; //absolute expiration time used by cache
 		uint16_t _rdLength; //specified in octets
 		std::vector<uint8_t> _rData; //length of rdLength, not null terminated
-		
+				
 		ResourceRecord();
 		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
 		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
@@ -90,22 +90,35 @@ class ResourceRecord{
 		
 		static uint32_t getInternetData(std::vector<uint8_t> data);
 		static std::string getNSData(std::vector<uint8_t>& msgBuff, std::vector<uint8_t>& data);
-	
+		
+		virtual std::string getConvertedRDataAsString();
+		virtual void convertRData() = 0;	
 
 };
 
-class NSResourceRecord : public ResourceRecord{
+class AResourceRecord : public ResourceRecord {
 
 	public:
-		std::string _answerDomainName;
-
+		std::string getConvertedRDataAsString();
+		void convertRData();
+		AResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
+		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		
+	private:
+		uint32_t _ip;
 
 }
 
-class AResourceRecord : public ResourceRecord{
+class NSResourceRecord : public ResourceRecord {
 
 	public:
-		uint32_t _ipAnswer;
+		std::string getConvertedRDataAsString();
+		void convertRData();
+		NSResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
+		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+
+	private:
+		std::string _domain;
 
 }
 
