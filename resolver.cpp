@@ -61,20 +61,6 @@ void loadSafeties(string filePath){
 	
 }
 
-string convertIpIntToString(uint32_t ip){
-
-	char buffer[INET_ADDRSTRLEN];
-	struct in_addr a;
-	a.s_addr = ip;
-	
-	inet_ntop(AF_INET, &a, buffer, INET_ADDRSTRLEN);
-	
-	string s = string(buffer);
-	
-	return s;
-
-}
-
 uint16_t pickNextId(){
 	
 	uint16_t max = 0;
@@ -295,32 +281,6 @@ int QueryState::extractDataFromResponse(){
 
 } 
 
-
-
-shared_ptr<QueryState> solveSubQuery(string leadName){
-
-	bool answerFound = false;
-	for(auto safetyIter = safety.begin(); safetyIter != safety.end() && !answerFound; safetyIter++){
-				
-		pair<string,string> sP = *safetyIter;
-		string sIp = sP.first;
-		string sName = sP.second;
-				
-		if(sName != authName){
-			vector<string> ips;
-			solveStandardQuery(sIp,authName,id,ips,recursive,safety);
-			for(auto conIter = ips.begin(); conIter != ips.end() && !answerFound; conIter++){
-				int contRet = solveStandardQuery(*conIter, questionDomainName, answers,recursive,safety);
-				if(contRet == SessionStates::answered) answerFound = true;
-			}
-		}
-				
-				
-				
-	}
-
-}
-
 void splitDomainName(string domainName, vector<string>& splits){
 	
 	
@@ -349,21 +309,18 @@ void splitDomainName(string domainName, vector<string>& splits){
 
 shared_ptr<QueryState> solveStandardQuery(string nameServerIp, string questionDomainName){
 
-	
 	cout << "SOLVING NAMESERVER: " << nameServerIp << " QUESTION: " << questionDomainName << endl;
-	
 	uint16_t id = pickNextId();
-	
 	shared_ptr<QueryState> state = make_shared<QueryState>(id, questionDomainName, (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in, networkResult);
 	
-	list<ResourceRecords> directCached = getRecordsFromCache(questionDomainName);
 	
+	//check cache directly for answers for this query. If we find any, we are done.
+	list<ResourceRecords> directCached = getRecordsFromCache(questionDomainName);
 	for(auto iter = directCached.begin(); iter < directCached.end(); iter++){
 	
 		ResourceRecord r = *iter;
 		if(r._rType == (uint16_t) ResourceTypes::a){
-			uint32_t ip = ResourceRecord::getInternetData(r._rData);
-			state->_answers.push_back(convertIpIntToString(ip));
+			state->_answers.push_back(r);
 		
 		}	
 	}
@@ -375,11 +332,9 @@ shared_ptr<QueryState> solveStandardQuery(string nameServerIp, string questionDo
 	
 	}
 	
-	
-	
 	vector<string> splits;
 	splitDomainName(questionDomainName, splits);
-	
+	//walking the current domain and ancestor domains to look for nameserver domain names we might want to consult, since we dont have an answer yet.
 	for(size_t i = 0; i < splits.size(); i++){
 		
 		string currDomain;
@@ -401,9 +356,21 @@ shared_ptr<QueryState> solveStandardQuery(string nameServerIp, string questionDo
 	
 			ResourceRecord r = *iter;
 			if(r._rType == (uint16_t) ResourceTypes::ns){
-				string domain = ResourceRecord::getNSData(msgBuff, r._rData);
-				if(ip > 0) state->_answers.push_back(convertIpIntToString(ip));
-		
+			
+				string domainName = r.getDataAsString();
+				vector<NameServerInfo>& servs = state._servs._servers;
+				
+				//dont want to add the same domain name of a name server multiple times if there are multiple ns records.
+				bool isUniqueName = true;
+				for (auto servIter = servs.begin(); servIter < servs.end(); servIter++){
+					if(*servIter == domainName){
+						isUniqueName = false;
+						break;
+					
+					}
+				}
+				
+				if(isUniqueName) servs.push_back(NameServerInfo(domainName, "", -1));
 			}
 	
 	
@@ -411,31 +378,43 @@ shared_ptr<QueryState> solveStandardQuery(string nameServerIp, string questionDo
 	
 	}
 	
+	//try to match addresses to these name servers we just identified.
+	//want to make sure we investigate all of the ips associated with a ns, so if ns has multiple ips expand the domain into more entries. 
+	vector<NameServerInfo> expandedDomains;
+	vector<NameServerInfo>& servs = state._servs._servers;
+	for(auto nsIter = servs.begin(); nsIter < servs.end(); nsIter++){
 	
-	
-	
-	
-	if(state._answers.size() > 0){
-	
-		reclaimId(state->_id);
-		return state;
-	
+		NameServerInfo& inf = *nsIter;
+		string currDomain = inf._name;
+		
+		list<ResourceRecords> matchCached = getRecordsFromCache(domain);
+		
+		for(auto iter = matchCached.begin(); iter < matchCached.end(); iter++){
+
+			ResourceRecord r = *iter;
+			if(r._rType == (uint16_t) ResourceTypes::a){
+			
+				string ip = r.getDataAsString();
+				string currIp = inf._address;
+				if(currIp == ""){
+					inf._address = ip;
+				}
+				else{
+					expandedDomains.push_back(NameServerInfo(currDomain,ip,-1);
+				
+				}
+				
+			}
+			
+		}		
+		
 	}
 	
+	for(auto expIter = expandedDomains.begin(); expIter < expandedDomains.end(); expIter++){
 	
+		servs.push_back(*expIter);
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+	}
 	
 	
 	

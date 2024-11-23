@@ -92,7 +92,7 @@ class SList{
 
 	public:
 		uint16_t _matchCount;
-		std::vector<struct NameServerInfo> _servers;
+		std::vector<NameServerInfo> _servers;
 		SList();	
 };
 
@@ -108,7 +108,7 @@ class QueryState{
 		//qclass of request
 		uint16_t _sclass;
 		//name servers this request thinks will be helpful
-		struct SList _servs;
+		SList _servs;
 		//number of operations left for this specific request until failure
 		int _numOpsLeftLocal;
 		//number of operations left for the series of requests that led to this one until failure
@@ -116,7 +116,7 @@ class QueryState{
 		//absolute time the request started
 		uint16_t _startTime;
 		//answers received for this query
-		vector<std::string> _answers;
+		vector<ResourceRecord> _answers;
 		
 		int _networkCode;
 		std::shared_ptr<DNSMessage> _lastResponse;

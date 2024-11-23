@@ -528,6 +528,88 @@ ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uin
 
 }
 
+string ResourceRecord::getDataAsString(){
+
+	string s;
+	for(auto iter = _rData.begin(); iter < _rData.end(); iter++){
+		s += *iter;
+	
+	}
+	return s;
+}
+
+NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
+
+	ResourceRecord(start, iter, end, succeeded);
+	convertRData(start, end);
+}
+
+AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
+
+	ResourceRecord(start, iter, end, succeeded);
+	convertRData();
+}
+
+string convertIpIntToString(uint32_t ip){
+
+	char buffer[INET_ADDRSTRLEN];
+	struct in_addr a;
+	a.s_addr = ip;
+	
+	inet_ntop(AF_INET, &a, buffer, INET_ADDRSTRLEN);
+	
+	string s = string(buffer);
+	
+	return s;
+
+}
+
+void AResourceRecord::convertRData(){
+
+	if(_rData.size() < 4){
+		_ip = 0;
+	}
+	else{
+		aType ip =  (((aType)_rData[3]) << 24) |  (((aType)_rData[2]) << 16) |  (((aType)_rData[1]) << 8) |  (((aType)_rData[0]));
+		_ip = ip; 
+	}
+
+}
+
+void AResourceRecord::convertRData(){
+
+	if(_rData.size() < 4){
+		_ip = 0;
+	}
+	else{
+		aType ip =  (((aType)_rData[3]) << 24) |  (((aType)_rData[2]) << 16) |  (((aType)_rData[1]) << 8) |  (((aType)_rData[0]));
+		_ip = ip; 
+	}
+
+}
+
+string AResourceRecord::getDataAsString(){
+
+	return convertIpIntToString(_ip);
+
+}
+
+void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
+
+	vector<uint8_t> realDomain;
+	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &_rData);
+	_domain = convertOctetSeqToString(realDomain);
+
+
+}
+
+string NSResourceRecord::getDataAsString(){
+
+	return _domain;
+}
+
+
+
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
 	convertOctetSequenceToBuffer(_name, buffer);
@@ -575,31 +657,32 @@ void ResourceRecord::print(uint16_t number = 0){
 
 }
 
-uint32_t ResourceRecord::getInternetData(vector<uint8_t> data){
-
-	if(data.size() < 4) return 0;
-	else return (((uint32_t)data[3]) << 24) |  (((uint32_t)data[2]) << 16) |  (((uint32_t)data[1]) << 8) |  (((uint32_t)data[0]));
-	
-}
-
-string ResourceRecord::getNSData(vector<uint8_t>& msgBuff, vector<uint8_t>& data){
-	
-	vector<uint8_t> realDomain;
-	vector<uint8_t>::iterator beg = msgBuff.begin();
-	//cout << "BUFFER" << endl;
-	//for(auto iter = msgBuff.begin(); iter != msgBuff.end(); iter++){
-	//	cout << (int) *iter << " ";
-	//
-	//}
-	//cout << endl;
-	convertBufferNameToVector(beg , beg, msgBuff.end(), realDomain, 0, &data);
-	return convertOctetSeqToString(realDomain);
-	
-}
-
 DNSMessage::DNSMessage(){};
 
 DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, vector<ResourceRecord>& answer, vector<ResourceRecord>& authority, vector<ResourceRecord>& additional): _hdr(hdr), _question(question), _answer(answer), _authority(authority), _additional(additional){};
+
+
+ResourceRecord GetCorrectResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
+
+	vector<uint8_t>::iterator locIter = iter;
+	ResourceRecord r = ResourceRecord(start, locIter, end);
+	
+	if(r._rType == (uint16_t) ResourceTypes::a){
+		
+		return AResourceRecord(start,iter,end,succeeded);
+	}
+	else if(r._rType == (uint16_t) ResourceTypes::ns){
+	
+		return NSResourceRecord(start,iter,end,succeeded);
+	
+	}
+	else{
+	
+		return ResourceRecord(start,iter,end,succeeded);
+	
+	}
+
+}
 
 DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end){
 
@@ -617,17 +700,17 @@ DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::i
 	
 	for(uint16_t i = 0; (i < _hdr._numAnswers) && recordSucceeded; i++){
 	
-		_answer.push_back(ResourceRecord(start,iter,end,recordSucceeded));
+		_answer.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAuthRR) && recordSucceeded; i++){
 	
-		_authority.push_back(ResourceRecord(start,iter,end,recordSucceeded));
+		_authority.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAdditRR) && recordSucceeded; i++){
 	
-		_additional.push_back(ResourceRecord(start,iter,end,recordSucceeded));
+		_additional.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
 	}
 
 

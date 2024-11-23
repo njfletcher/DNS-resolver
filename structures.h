@@ -8,7 +8,6 @@
 
 #define maxDomainNameLen 255
 
-
 class DNSFlags{
 
 	public:
@@ -88,40 +87,35 @@ class ResourceRecord{
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print(uint16_t number);
 		
-		static uint32_t getInternetData(std::vector<uint8_t> data);
-		static std::string getNSData(std::vector<uint8_t>& msgBuff, std::vector<uint8_t>& data);
-		
-		virtual std::string getConvertedRDataAsString();
-		virtual void convertRData() = 0;	
+		virtual std::string getDataAsString();	
+		virtual void convertRData() = 0;
 
 };
 
-class AResourceRecord : public ResourceRecord {
+
+class NSResourceRecord: public ResourceRecord {
 
 	public:
-		std::string getConvertedRDataAsString();
+		std::string getDataAsString();
 		void convertRData();
-		AResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
+		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		
+	private:
+		std::string _domain;
+
+}
+
+class AResourceRecord: public ResourceRecord {
+
+	public:
+		std::string getDataAsString();
+		void convertRData();
 		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		
 	private:
 		uint32_t _ip;
 
 }
-
-class NSResourceRecord : public ResourceRecord {
-
-	public:
-		std::string getConvertedRDataAsString();
-		void convertRData();
-		NSResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
-		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-
-	private:
-		std::string _domain;
-
-}
-
 
 
 class DNSMessage{
