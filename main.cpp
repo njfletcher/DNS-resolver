@@ -19,7 +19,7 @@ int main(int argc, char** argv){
 	
 	}
 	
-	vector<pair<string,string> > servers;
+	/*vector<pair<string,string> > servers;
 	readSafetyFile(argv[2], servers);
 
 	verifyRootNameServers(servers);
@@ -34,18 +34,10 @@ int main(int argc, char** argv){
 	
 	}
 	
-	vector<string> ans;
-	if(startIp != ""){
-		solveStandardQuery(startIp, argv[1], 0, ans, true, servers);
-		cout << "ANSWERS+++++++++++++++++++++++++++++++++++++++++++++++=" << endl;
-		for(auto iter = ans.begin(); iter < ans.end(); iter++){
-			cout << *iter <<endl;
-		
-		}
-	}
-	else{
-		cout << "no valid start points for query" << endl;
-	}
+	*/
+	
+	QueryState q = QueryState(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
+	solveStandardQuery(q);
 	
 	
 	return 0;

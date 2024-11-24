@@ -9,7 +9,7 @@
 #include <ctime>
 
 #define perRequestOpCap 10
-#define perSequenceOpCap 50
+#define perSequenceOpCap 1000
 
 
 enum class SessionStates{
@@ -79,49 +79,44 @@ enum class ResponseCodes{
 };
 
 
-class NameServerInfo{
-
-	public:
-		std::string _name;
-		std::string _address;
-		int _score;
-		NameServerInfo(std::string name, std::string address, int score);
-};
-
-class SList{
-
-	public:
-		uint16_t _matchCount;
-		std::vector<NameServerInfo> _servers;
-		SList();	
-};
-
 class QueryState{
 
 	public:
 		//id of the original query
 		uint16_t _id;
+		
 		//name queried
 		std::string _sname;
+		
 		//qtype of request
 		uint16_t _stype;
+		
 		//qclass of request
 		uint16_t _sclass;
+		
 		//name servers this request thinks will be helpful
-		SList _servs;
+		vector<QueryState> _nextServers;
+		
 		//number of operations left for this specific request until failure
-		int _numOpsLeftLocal;
+		int _numOpsLocal;
+		
 		//number of operations left for the series of requests that led to this one until failure
-		int _numOpsLeftGlobal;
+		std::shared_ptr<int> _numOpsGlobal;
+		
 		//absolute time the request started
 		uint16_t _startTime;
+		
 		//answers received for this query
 		vector<ResourceRecord> _answers;
 		
 		int _networkCode;
 		std::shared_ptr<DNSMessage> _lastResponse;
 		
-		QueryState(uint16_t id, std::string sname, uint16_t stype, uint16_t sclass);
+		~QueryState();
+		//for an original query
+		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
+		//for follow ups that spawn from an original
+		QueryState(std::string sname, uint16_t stype, uint16_t sclass, std::shared_ptr<int> globalOps);
 		int extractDataFromResponse();
 		void cacheRecords();
 		
@@ -133,7 +128,7 @@ class QueryState{
 };
 
 void loadSafeties(std::string filePath);
-int solveStandardQuery(std::string nameServerIp, std::string questionDomainName);
+void solveStandardQuery(QueryState query);
 void verifyRootNameServers(std::vector<std::pair<std::string,std::string> >& servers);
 
 

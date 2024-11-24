@@ -576,17 +576,6 @@ void AResourceRecord::convertRData(){
 
 }
 
-void AResourceRecord::convertRData(){
-
-	if(_rData.size() < 4){
-		_ip = 0;
-	}
-	else{
-		aType ip =  (((aType)_rData[3]) << 24) |  (((aType)_rData[2]) << 16) |  (((aType)_rData[1]) << 8) |  (((aType)_rData[0]));
-		_ip = ip; 
-	}
-
-}
 
 string AResourceRecord::getDataAsString(){
 
