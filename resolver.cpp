@@ -17,8 +17,8 @@ using namespace std;
 
 vector<uint16_t> takenIds;
 vector<pair<string,string> > safety;
-//maps domain name to valid resource records
-unordered_map<string, list<ResourceRecord> > cache;
+
+unordered_map<string, list<ResourceRecord>> cache;
 
 uint16_t pickNextId(){
 	
@@ -55,14 +55,20 @@ QueryState::~QueryState(){
 
 }
 
-QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass): _id(id), _sname(sname), _stype(stype), _sclass(sclass), _networkCode(NetworkErrors::none) {
+QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass): _id(id), _sname(sname), _stype(stype), _sclass(sclass){ 
 
+	_readyForUse = true;
+	_networkCode = (int) NetworkErrors::none;
+	_msgCode = (uint8_t) ResponseCodes::none;
 	_startTime = time(NULL);
 	_id = pickNextId();
 }
 
-QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass, shared_ptr<int> globalOps): _id(id), _sname(sname), _stype(stype), _sclass(sclass), _networkCode(NetworkErrors::none) {
+QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass, shared_ptr<int> globalOps): _id(id), _sname(sname), _stype(stype), _sclass(sclass) {
 
+	_readyForUse = true;
+	_networkCode = (int) NetworkErrors::none;
+	_msgCode = (uint8_t) ResponseCodes::none;
 	_numOpsGlobal = globalOps;
 	_startTime = time(NULL);
 	_id = pickNextId();
@@ -107,7 +113,7 @@ void insertRecordIntoCache(ResourceRecord& r){
 
 	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
 	if(r._ttl > 0){
-		list<ResourceRecord>& records = cache[convertOctetSeqToString(r._name)];
+		list<ResourceRecord>& records = cache[r._realName()];
 		records.push_back(r);
 	}
 
@@ -115,9 +121,8 @@ void insertRecordIntoCache(ResourceRecord& r){
 
 list<ResourceRecord> getRecordsFromCache(string domainName){
 
-	
-	if(cach.find(domainName) != cache.end()){
-		list<ResourceRecord>& records = cache[convertOctetSeqToString(r._name)];
+	if(cache.find(domainName) != cache.end()){
+		list<ResourceRecord>& records = cache[r._realName];
 		for(auto iter = records.begin(); iter < records.end(); iter++){
 			ResourceRecord r = *iter;
 			if(r._cacheExpireTime < time(NULL)){
@@ -137,9 +142,9 @@ list<ResourceRecord> getRecordsFromCache(string domainName){
 
 
 //assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
-QueryState::cacheRecords(){
+QueryState::cacheRecords(DNSMessage& msg){
 
-	for(auto iter = _lastResponse->_answer.begin(); iter < _lastResponse->_answer.end(); iter++){
+	for(auto iter = msg._answer.begin(); iter < msg._answer.end(); iter++){
 	
 		ResourceRecord& r = *iter;
 		r._cacheExpireTime = _startTime + r._ttl;
@@ -147,7 +152,7 @@ QueryState::cacheRecords(){
 	
 	}
 	
-	for(auto iter = _lastResponse->_authority.begin(); iter < _lastResponse->_authority.end(); iter++){
+	for(auto iter = msg._authority.begin(); iter < msg._authority.end(); iter++){
 	
 		ResourceRecord& r = *iter;
 		r._cacheExpireTime = _startTime + r._ttl;
@@ -155,7 +160,7 @@ QueryState::cacheRecords(){
 	
 	}
 	
-	for(auto iter = _lastResponse->_additional.begin(); iter < _lastResponse->_additional.end(); iter++){
+	for(auto iter = msg._additional.begin(); iter < msg._additional.end(); iter++){
 	
 		ResourceRecord& r = *iter;
 		r._cacheExpireTime = _startTime + r._ttl;
@@ -166,36 +171,8 @@ QueryState::cacheRecords(){
 
 }
 
+bool QueryState::checkForResponseErrors(DNSMessage& resp){
 
-void sendStandardQuery(string nameServerIp, shared_ptr<QueryState>& state){
-
-
-	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
-	DNSHeader hdr(id, flg, 1, 0, 0,0);
-	QuestionRecord q(state._sname.c_str(), state._stype , state._sclass );
-	
-	vector<QuestionRecord> qr = {q};
-	vector<ResourceRecord> rr;
-	DNSMessage msg(hdr, qr, rr, rr, rr );
-	
-	vector<uint8_t> buff;
-	vector<uint8_t> resp;
-	msg.toBuffer(buff);
-
-	int networkResult = sendMessageResolverClient(nameServerIp, buff, resp);
-	
-	if(networkResult == (int) NetworkCodes::none){
-		auto iter = resp.begin();
-		state->_lastResponse = make_shared<DNSMessage>(iter, iter, resp.end());
-	
-	}
-
-}
-
-
-bool QueryState::checkForResponseErrors(){
-
-	DNSMessage resp = *(_lastResponse);
 
 	if(_networkCode != (int) NetworkErrors::none){
 	
@@ -226,73 +203,94 @@ bool QueryState::checkForResponseErrors(){
 
 }
 
+void QueryState::extractDataFromResponse(DNSMessage& msg){
 
 
-
-int QueryState::extractDataFromResponse(){
-
-
-	if(checkForResponseErrors()) return (int) SessionStates::failed;
+	if(checkForResponseErrors()) return;
 	else cacheRecords();
 	
-	vector<uint8_t> msgBuff;
-	_lastResponse.toBuffer(msgBuff);
 	
-	uint16_t numAnswersClaim = resp._hdr._numAnswers;
-	size_t numAnswersActual = resp._answer.size();
+	uint16_t numAnswersClaim = msg._hdr._numAnswers;
+	size_t numAnswersActual = msg._answer.size();
 	//dont need to bother checking if they dont claim there are any answers. But dont trust the claimed number for looping, could be huge or at least incorrect.
 	if(numAnswersClaim > 0){
 		
 		for(size_t i =0; i < numAnswersActual; i++){
-			ResourceRecord r = resp._answer[i];
-			if( r._rType == (uint16_t)ResourceTypes::a){
-			
-				uint32_t ip = ResourceRecord::getInternetData(r._rData);
-				if(ip > 0) answerIps.push_back(convertIpIntToString(ip));
+			ResourceRecord r = msg._answer[i];
+			if(r._rType == (uint16_t) ResourceTypes::a){
+				_answers.push_back(r);
 			}
 		
 		}
-		if(answerIps.size() > 0) return SessionStates::answered;
+		
+		if(_answers.size() > 0){
+			return;
+		}
 	
 	}
 	
-	uint16_t numAuthClaim = resp._hdr._numAuthRR;
-	size_t numAuthActual = resp._authority.size();
+	uint16_t numAuthClaim = msg._hdr._numAuthRR;
+	size_t numAuthActual = msg._authority.size();
 	if(numAuthClaim > 0){
-		
+	
 		for(size_t i =0; i < numAuthActual; i++){
-			ResourceRecord r = resp._authority[i];
-			if( r._rType == (uint16_t)ResourceTypes::ns){
-				string domain = ResourceRecord::getNSData(msgBuff, r._rData);
-				pair<string, string> p("",domain);
-				authMaps.push_back(p);
+			ResourceRecord r = msg._authority[i];
+			if(r._rType == (uint16_t) ResourceTypes::a){
+				_answers.push_back(r);
 			}
-		
+			if(r._rType == (uint16_t) ResourceTypes::ns){
+				_answers.push_back(r);
+			}
 		}
 	
 	}
 	
-	/*uint16_t numAdditClaim = resp._hdr._numAdditRR;
-	size_t numAdditActual = resp._additional.size();
+	uint16_t numAdditClaim = msg._hdr._numAdditRR;
+	size_t numAdditActual = msg._additional.size();
 	if(numAdditClaim > 0){
 		
 		for(size_t i =0; i < numAdditActual; i++){
-			ResourceRecord r = resp._additional[i];
-			if( r._rType == (uint8_t)ResourceTypes::a){
-			
-			}
+			ResourceRecord r = msg._additional[i];
+			r.affectNextServersData(this);
 		
 		}
 		
-		return SessionStates::continued;
+	}
 	
-	}*/
-	
-	
-	
-	return SessionStates::failed;
-
 } 
+
+
+void sendStandardQuery(string nameServerIp, QueryState& state){
+
+
+	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
+	DNSHeader hdr(id, flg, 1, 0, 0,0);
+	QuestionRecord q(state._sname.c_str(), state._stype , state._sclass );
+	
+	vector<QuestionRecord> qr = {q};
+	vector<ResourceRecord> rr;
+	DNSMessage msg(hdr, qr, rr, rr, rr );
+	
+	vector<uint8_t> buff;
+	vector<uint8_t> resp;
+	msg.toBuffer(buff);
+
+	int networkResult = sendMessageResolverClient(nameServerIp, buff, resp);
+	
+	state._networkCode = networkResult;
+	
+	if(networkResult == (int) NetworkCodes::none){
+		auto iter = resp.begin();
+		DNSMessage msg = DNSMessage(iter, iter, resp.end());
+		state._msgCode = msg._hdr._flags._rcode;
+		
+		state.extractDataFromResponse(msg);
+	
+	}
+	
+
+}
+
 
 void splitDomainName(string domainName, vector<string>& splits){
 	
@@ -322,21 +320,21 @@ void splitDomainName(string domainName, vector<string>& splits){
 
 void solveStandardQuery(QueryState& query){
 
+	query._readyForUse = false;
+
 	//check cache directly for answers for this query. If we find any, we are done.
 	list<ResourceRecord> directCached = getRecordsFromCache(query._sname);
+	
 	for(auto iter = directCached.begin(); iter < directCached.end(); iter++){
 	
 		ResourceRecord r = *iter;
-		if(r._rType == (uint16_t) ResourceTypes::a){
-			query._answers.push_back(r);
+		r.affectAnswers(&query);
 		
-		}	
 	}
 	
 	if(query._answers.size() > 0){
-	
-		return;
-	
+		query._readyForUse = true; 
+		return; 
 	}
 	
 	vector<string> splits;
@@ -362,23 +360,7 @@ void solveStandardQuery(QueryState& query){
 		for(auto iter = directCached.begin(); iter < directCached.end(); iter++){
 	
 			ResourceRecord r = *iter;
-			if(r._rType == (uint16_t) ResourceTypes::ns){
-			
-				string domainName = r.getDataAsString();
-				vector<QueryState>& servs = query._nextServers;
-				
-				//dont want to add the same domain name of a name server multiple times if there are multiple ns records.
-				bool isUniqueName = true;
-				for (auto servIter = servs.begin(); servIter < servs.end(); servIter++){
-					if(servIter->_sname == domainName){
-						isUniqueName = false;
-						break;
-					
-					}
-				}
-				
-				if(isUniqueName) query._nextServers.push_back(QueryState(domainName, query._stype, query._sclass));
-			}
+			r.affectNextServersNames(&query);
 	
 	
 		}
@@ -398,10 +380,7 @@ void solveStandardQuery(QueryState& query){
 		for(auto iter = matchCached.begin(); iter < matchCached.end(); iter++){
 
 			ResourceRecord r = *iter;
-			if(r._rType == (uint16_t) ResourceTypes::a){
-			
-				inf._answers.push_back(r);
-			}
+			r.affectNextServersData(&query);
 			
 		}		
 		
@@ -416,91 +395,70 @@ void solveStandardQuery(QueryState& query){
 	
 		QueryState& inf = *nsIter;
 		
+		
 		if(inf._answers.size() < 1){
 		
-			 pid_t pid = fork();
+			pid_t pid = fork();
 			 
-			 if(pid < 0){
+			if(pid < 0){
 			 
-			 	exit(EXIT_FAILURE)
-			 }
-			 //child process will resolve name server answer in background
-			 //parent process will keep looping and eventually continue on to asking name servers(whose ips are being resolved in the background) for its own answer.
-			 else if (pid == 0){
+				exit(EXIT_FAILURE)
+			}
+			//child process will resolve name server answer in background
+			//parent process will keep looping and eventually continue on to asking name servers(whose ips are being resolved in the background) for its own answer.
+			else if (pid == 0){
 			 
-			 	solveStandardQuery(inf);
-			 	exit(0);
+				solveStandardQuery(inf);
+				exit(0);
 			 
-			 }
+			}
 			 
 		
 		}
 			
 	}
-
 	
-
-
-
-
-
 	
-	shared_ptr<QueryState> queryState = sendStandardQuery(nameServerIp,questionDomainName);
-	SessionStates initialReturn = queryState.extractDataFromResponse();
-		
-	if(initialReturn == SessionStates::answered){
 	
-		return queryState;
-		
-		
-	}
-	//we didnt get an answer, but we should investigate the authoritative servers that might allow us to continue
-	else if (initialReturn == SessionStates::continued){
+	//one thread devoted to each nameserver for resolving the current query.
+	//if a nameserver does not yet have an address(and it isnt currently being investigated by threads from above), use the nameserver's thread to resolve its address.
+	//if a nameserver has multiple ips on record, they are all investigated on the same thread for simplicity.
+	vector<NameServerInfo>& nsServers = query._nextServers;
+	for(auto nsIter = nsServers.begin(); nsIter < nsServers.end(); nsIter++){
 	
-		vector<struct NameServerInfo> leads = _servs._servers;
-	
-		for(auto leadIter = leads.begin(); leadsIter != leads.end(); leadIter++){
-		
-			pair<string,string> leadP = *leadIter;
-			string leadIp = leadP.first;
-			string leadName = leadP.second;
-			cout << "domain " << authName << " ip " << authIp << endl;
-				
-			if(leadIp != ""){
-				shared_ptr<QueryState> leadState = solveStandardQuery(leadIp,questionDomainName);
-				
-			}
-			else{
-			
-			
-			}
-			
-			
-			if(answerFound){
-				return SessionStates::answered;
-			}
-			else return SessionStates::failed;
-				
-				
-		
+		pid_t pid = fork();
+			 
+		if(pid < 0){
+			exit(EXIT_FAILURE)
 		}
+		//child process will resolve name server answer in background
+		//parent process will keep looping and eventually continue on to asking name servers(whose ips are being resolved in the background) for its own answer.
+		else if (pid == 0){
 		
-		cout << "ADDIT CONTINUED" << endl;
-		for(auto iter = addits.begin(); iter != addits.end(); iter++){
-		
-			pair<string,string> p = *iter;
-			cout << "domain " << p.second << " ip " << p.first << endl;
-		
+			QueryState& inf = *nsIter;
+			
+			if(inf._readyForUse && inf._numOpsLocalLeft > 0){
+			
+				//ready for use yet no answers available. This means it got added on the fly and still needs an address
+				if(inf._answers.size() < 1){
+					solveStandardQuery(inf);
+				}
+				else{
+					vector<ResourceRecords
+					for(auto ansIter = 
+				
+				}
+			
+			}
+			
+			solveStandardQuery(inf);
+			exit(0);
+			 
 		}
-	
+			
+			
 	}
-	else{
-		return SessionStates::failed;
-	
-	}
-	
-	return SessionStates::failed;
-
+		
 
 }
 

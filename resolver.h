@@ -82,6 +82,11 @@ enum class ResponseCodes{
 class QueryState{
 
 	public:
+	
+		//is this querysInformation able to be used?
+		//will be false if this query's answers are being gathered or some query is being resolved using this one 
+		bool _readyForUse;
+	
 		//id of the original query
 		uint16_t _id;
 		
@@ -98,10 +103,12 @@ class QueryState{
 		vector<QueryState> _nextServers;
 		
 		//number of operations left for this specific request until failure
-		int _numOpsLocal;
+		//0 means termination. This could be from exhausting ops, finding answers, or fatal errors.
+		unsigned int _numOpsLocalLeft;
 		
 		//number of operations left for the series of requests that led to this one until failure
-		std::shared_ptr<int> _numOpsGlobal;
+		//0 means sequence has terminated. Same reasons as above.
+		std::shared_ptr<unsigned int> _numOpsGlobal;
 		
 		//absolute time the request started
 		uint16_t _startTime;
@@ -110,18 +117,21 @@ class QueryState{
 		vector<ResourceRecord> _answers;
 		
 		int _networkCode;
-		std::shared_ptr<DNSMessage> _lastResponse;
-		
+		uint8_t _msgCode;
+
 		~QueryState();
 		//for an original query
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
 		//for follow ups that spawn from an original
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, std::shared_ptr<int> globalOps);
-		int extractDataFromResponse();
-		void cacheRecords();
+		
 		
 	private:
-		int checkForResponseErrors();
+		void matchAnswerToNextServers(ResourceRecord& r);
+		void addNextServer(ResourceRecord& ns);
+		void extractDataFromResponse(DNSMessage& msg);
+		void cacheRecords(DNSMessage& msg);
+		bool checkForResponseErrors(DNSMessage& msg);
 		
 		
 

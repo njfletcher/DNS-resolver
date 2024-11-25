@@ -55,6 +55,7 @@ class QuestionRecord{
 
 	public:
 		std::vector<uint8_t> _name; // a sequence of octets that repeats the pattern: length octet = n, n octets 
+		std::string _realName;
 		uint16_t _qType;
 		uint16_t _qClass;
 		
@@ -71,15 +72,17 @@ class QuestionRecord{
 class ResourceRecord{
 
 	public:
-		
 		std::vector<uint8_t> _name; // a sequence of octets that repeats the pattern: length octet = n, n octets 
+		std::string _realName;
 		uint16_t _rType;
 		uint16_t _rClass;
 		uint32_t _ttl; //relative time to live given by server
 		std::time_t _cacheExpireTime; //absolute expiration time used by cache
 		uint16_t _rdLength; //specified in octets
 		std::vector<uint8_t> _rData; //length of rdLength, not null terminated
+		void* _convData;
 				
+		~ResourceRecord();
 		ResourceRecord();
 		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
 		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
@@ -87,36 +90,10 @@ class ResourceRecord{
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print(uint16_t number);
 		
-		virtual std::string getDataAsString();	
-		virtual void convertRData() = 0;
+		std::string getDataAsString();
+		void convertRData();
 
 };
-
-
-class NSResourceRecord: public ResourceRecord {
-
-	public:
-		std::string getDataAsString();
-		void convertRData();
-		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-		
-	private:
-		std::string _domain;
-
-}
-
-class AResourceRecord: public ResourceRecord {
-
-	public:
-		std::string getDataAsString();
-		void convertRData();
-		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-		
-	private:
-		uint32_t _ip;
-
-}
-
 
 class DNSMessage{
 

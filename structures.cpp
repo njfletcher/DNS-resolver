@@ -438,6 +438,7 @@ QuestionRecord::QuestionRecord(){};
 
 QuestionRecord::QuestionRecord(const char * name, uint16_t qType, uint16_t qClass): _qType(qType), _qClass(qClass) {
 
+	_realName = string(name);
 	convertCStringToOctetForm(name, _name);
 };
 
@@ -445,6 +446,7 @@ QuestionRecord::QuestionRecord(const vector<uint8_t>::iterator start, vector<uin
 
 	
 	convertBufferNameToVector(start, iter, end, _name, 0);
+	_realName = convertOctetSeqToString(_name);
 	
 	_qType = 0;
 	_qClass = 0;
@@ -492,13 +494,55 @@ ResourceRecord::ResourceRecord(){};
 ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, vector<uint8_t> rData): _rType(rType), _rClass(rClass), _ttl(ttl), _rdLength(rdLength){
 
 	_rData = rData;
+	_realName = string(name);
 	convertCStringToOctetForm(name, _name);
 
+}
+
+string convertIpIntToString(uint32_t ip){
+
+	char buffer[INET_ADDRSTRLEN];
+	struct in_addr a;
+	a.s_addr = ip;
+	
+	inet_ntop(AF_INET, &a, buffer, INET_ADDRSTRLEN);
+	
+	string s = string(buffer);
+	
+	return s;
+
+}
+
+uint32_t convertARData(vector<uint8_t> & rData){
+
+	if(rData.size() < 4){
+		return 0;
+	}
+	else{
+		uint32_t add =  (((uint32_t)rData[3]) << 24) |  (((uint32_t)rData[2]) << 16) |  (((uint32_t)rData[1]) << 8) |  (((uint32_t)rData[0]));
+		return add; 
+	}
+
+}
+
+string convertNSRData(vector<uint8_t>& rData, vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
+
+	vector<uint8_t> realDomain;
+	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &rData);
+	return convertOctetSeqToString(realDomain);
+
+
+}
+
+ResourceRecord::~ResourceRecord(){
+
+	delete _convData;
 }
 
 ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
 
 	convertBufferNameToVector(start, iter, end, _name, 0);
+	_realName = convertOctetSeqToString(_name);
 	
 	_rType = 0;
 	_rClass = 0;
@@ -525,79 +569,46 @@ ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uin
 		iter = iter + 1;
 	}
 	
+	
+	if(_rType == (uint16_t) ResourceTypes::a){
+	
+		_convData = new uint32_t;
+		*_convData = convertARData(_rData);
+	}
+	else if(_rType == (uint16_t) ResourceTypes::ns){
+	
+		_convData = new string();
+		*_convData = convertNSData(_rData, start, end);
+	}
+	else{
+	
+		_convData = new int;
+		*_convData = 0;
+		
+	}
+	
 
 }
 
 string ResourceRecord::getDataAsString(){
 
-	string s;
-	for(auto iter = _rData.begin(); iter < _rData.end(); iter++){
-		s += *iter;
+	if(_rType == (uint16_t) ResourceTypes::a){
 	
+		uint32_t ip = *((uint32_t *) _convData);
+		return convertIpIntToString(ip);
 	}
-	return s;
-}
-
-NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
-
-	ResourceRecord(start, iter, end, succeeded);
-	convertRData(start, end);
-}
-
-AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
-
-	ResourceRecord(start, iter, end, succeeded);
-	convertRData();
-}
-
-string convertIpIntToString(uint32_t ip){
-
-	char buffer[INET_ADDRSTRLEN];
-	struct in_addr a;
-	a.s_addr = ip;
+	else if(_rType == (uint16_t) ResourceTypes::ns){
 	
-	inet_ntop(AF_INET, &a, buffer, INET_ADDRSTRLEN);
-	
-	string s = string(buffer);
-	
-	return s;
-
-}
-
-void AResourceRecord::convertRData(){
-
-	if(_rData.size() < 4){
-		_ip = 0;
+		string domain = *((string *) _convData);
+		return domain;
 	}
 	else{
-		aType ip =  (((aType)_rData[3]) << 24) |  (((aType)_rData[2]) << 16) |  (((aType)_rData[1]) << 8) |  (((aType)_rData[0]));
-		_ip = ip; 
+	
+		return "";
+		
 	}
 
 }
-
-
-string AResourceRecord::getDataAsString(){
-
-	return convertIpIntToString(_ip);
-
-}
-
-void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
-
-	vector<uint8_t> realDomain;
-	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &_rData);
-	_domain = convertOctetSeqToString(realDomain);
-
-
-}
-
-string NSResourceRecord::getDataAsString(){
-
-	return _domain;
-}
-
-
 
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
@@ -651,28 +662,6 @@ DNSMessage::DNSMessage(){};
 DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, vector<ResourceRecord>& answer, vector<ResourceRecord>& authority, vector<ResourceRecord>& additional): _hdr(hdr), _question(question), _answer(answer), _authority(authority), _additional(additional){};
 
 
-ResourceRecord GetCorrectResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
-
-	vector<uint8_t>::iterator locIter = iter;
-	ResourceRecord r = ResourceRecord(start, locIter, end);
-	
-	if(r._rType == (uint16_t) ResourceTypes::a){
-		
-		return AResourceRecord(start,iter,end,succeeded);
-	}
-	else if(r._rType == (uint16_t) ResourceTypes::ns){
-	
-		return NSResourceRecord(start,iter,end,succeeded);
-	
-	}
-	else{
-	
-		return ResourceRecord(start,iter,end,succeeded);
-	
-	}
-
-}
-
 DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end){
 
 	//first two will be tcp length, which can be disregarded
@@ -689,17 +678,17 @@ DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::i
 	
 	for(uint16_t i = 0; (i < _hdr._numAnswers) && recordSucceeded; i++){
 	
-		_answer.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
+		_answer.push_back(ResourceRecord(start,iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAuthRR) && recordSucceeded; i++){
 	
-		_authority.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
+		_authority.push_back(ResourceRecord(start,iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAdditRR) && recordSucceeded; i++){
 	
-		_additional.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
+		_additional.push_back(ResourceRecord(start,iter,end,recordSucceeded));
 	}
 
 
