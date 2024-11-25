@@ -114,7 +114,7 @@ class QueryState{
 		uint16_t _startTime;
 		
 		//answers received for this query
-		vector<ResourceRecord> _answers;
+		vector<std::string> _answers;
 		
 		int _networkCode;
 		uint8_t _msgCode;
@@ -124,6 +124,10 @@ class QueryState{
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
 		//for follow ups that spawn from an original
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, std::shared_ptr<int> globalOps);
+		
+		void expandAnswers(shared_ptr<ResourceRecord> r);
+		void expandNextServerAnswer(shared_ptr<ResourceRecord> r);
+		void expandNextServers(shared_ptr<ResourceRecord> r);
 		
 		
 	private:

@@ -499,45 +499,6 @@ ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClas
 
 }
 
-string convertIpIntToString(uint32_t ip){
-
-	char buffer[INET_ADDRSTRLEN];
-	struct in_addr a;
-	a.s_addr = ip;
-	
-	inet_ntop(AF_INET, &a, buffer, INET_ADDRSTRLEN);
-	
-	string s = string(buffer);
-	
-	return s;
-
-}
-
-uint32_t convertARData(vector<uint8_t> & rData){
-
-	if(rData.size() < 4){
-		return 0;
-	}
-	else{
-		uint32_t add =  (((uint32_t)rData[3]) << 24) |  (((uint32_t)rData[2]) << 16) |  (((uint32_t)rData[1]) << 8) |  (((uint32_t)rData[0]));
-		return add; 
-	}
-
-}
-
-string convertNSRData(vector<uint8_t>& rData, vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
-
-	vector<uint8_t> realDomain;
-	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &rData);
-	return convertOctetSeqToString(realDomain);
-
-
-}
-
-ResourceRecord::~ResourceRecord(){
-
-	delete _convData;
-}
 
 ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
 
@@ -570,44 +531,17 @@ ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uin
 	}
 	
 	
-	if(_rType == (uint16_t) ResourceTypes::a){
-	
-		_convData = new uint32_t;
-		*_convData = convertARData(_rData);
-	}
-	else if(_rType == (uint16_t) ResourceTypes::ns){
-	
-		_convData = new string();
-		*_convData = convertNSData(_rData, start, end);
-	}
-	else{
-	
-		_convData = new int;
-		*_convData = 0;
-		
-	}
-	
-
 }
 
 string ResourceRecord::getDataAsString(){
 
-	if(_rType == (uint16_t) ResourceTypes::a){
+	string s;
+	for(auto iter = _rData.begin(); iter < _rData.end(); iter++){
 	
-		uint32_t ip = *((uint32_t *) _convData);
-		return convertIpIntToString(ip);
-	}
-	else if(_rType == (uint16_t) ResourceTypes::ns){
+		s += *iter;
 	
-		string domain = *((string *) _convData);
-		return domain;
 	}
-	else{
-	
-		return "";
-		
-	}
-
+	return s;
 }
 
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
@@ -654,12 +588,87 @@ void ResourceRecord::print(uint16_t number = 0){
 	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^END RESOURCERECORD " << number << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
 
+}
 
+void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
+	vector<uint8_t> realDomain;
+	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &_rData);
+	_domain = convertOctetSeqToString(realDomain);
+}
+
+NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
+	ResourceRecord(start, iter, end, succeeded);
+	convertRData(start, end);
+}
+
+
+string NSResourceRecord::getDataAsString(){
+	return _domain;
+}
+
+string convertIpIntToString(uint32_t ip){
+
+	char buffer[INET_ADDRSTRLEN];
+	struct in_addr a;
+	a.s_addr = ip;
+	
+	inet_ntop(AF_INET, &a, buffer, INET_ADDRSTRLEN);
+	
+	string s = string(buffer);
+	
+	return s;
+
+}
+
+void AResourceRecord::convertRData(){
+
+	if(_rData.size() < 4){
+		_ip = 0;
+	}
+	else{
+		uint32_t ip =  (((uint32_t)_rData[3]) << 24) |  (((uint32_t)_rData[2]) << 16) |  (((uint32_t)_rData[1]) << 8) |  (((uint32_t)_rData[0]));
+		_ip = ip; 
+	}
+
+}
+
+AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
+	ResourceRecord(start, iter, end, succeeded);
+	convertRData();
+}
+
+
+string AResourceRecord::getDataAsString(){
+
+	return convertIpIntToString(_ip);
 }
 
 DNSMessage::DNSMessage(){};
 
-DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, vector<ResourceRecord>& answer, vector<ResourceRecord>& authority, vector<ResourceRecord>& additional): _hdr(hdr), _question(question), _answer(answer), _authority(authority), _additional(additional){};
+DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, vector<shared_ptr<ResourceRecord> >& answer, vector<shared_ptr<ResourceRecord> >& authority, vector<shared_ptr<ResourceRecord> >& additional): _hdr(hdr), _question(question), _answer(answer), _authority(authority), _additional(additional){};
+
+
+
+shared_ptr<ResourceRecord> GetCorrectResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
+
+	vector<uint8_t>::iterator locIter = iter;
+	ResourceRecord r = ResourceRecord(start, locIter, end);
+	
+	if(r._rType == (uint16_t) ResourceTypes::a){
+		
+		return make_shared<AResourceRecord>(start,iter,end,succeeded);
+	}
+	else if(r._rType == (uint16_t) ResourceTypes::ns){
+	
+		return make_shared<NSResourceRecord>(start,iter,end,succeeded);
+	
+	}
+	else{
+	
+		return make_shared<ResourceRecord>(start,iter,end,succeeded);
+	
+	}
+}
 
 
 DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end){
@@ -678,17 +687,17 @@ DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::i
 	
 	for(uint16_t i = 0; (i < _hdr._numAnswers) && recordSucceeded; i++){
 	
-		_answer.push_back(ResourceRecord(start,iter,end,recordSucceeded));
+		_answer.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAuthRR) && recordSucceeded; i++){
 	
-		_authority.push_back(ResourceRecord(start,iter,end,recordSucceeded));
+		_authority.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAdditRR) && recordSucceeded; i++){
 	
-		_additional.push_back(ResourceRecord(start,iter,end,recordSucceeded));
+		_additional.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
 	}
 
 
@@ -709,17 +718,17 @@ void DNSMessage::toBuffer(vector<uint8_t> & buffer){
 	
 	for(uint16_t i = 0; i < _hdr._numAnswers; i++){
 	
-		_answer[i].toBuffer(buffer);
+		_answer[i]->toBuffer(buffer);
 	}
 	
 	for(uint16_t i = 0; i < _hdr._numAuthRR; i++){
 	
-		_authority[i].toBuffer(buffer);
+		_authority[i->toBuffer(buffer);
 	}
 	
 	for(uint16_t i = 0; i < _hdr._numAdditRR; i++){
 	
-		_additional[i].toBuffer(buffer);
+		_additional[i]->toBuffer(buffer);
 	}
 		
 }
@@ -740,14 +749,14 @@ void DNSMessage::print(){
 	
 	for(uint16_t i = 0; i < _hdr._numAnswers; i++){
 	
-		_answer[i].print(i);
+		_answer[i]->print(i);
 	}
 	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END ANSWERS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
 	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START AUTHORITY^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	for(uint16_t i = 0; i < _hdr._numAuthRR; i++){
 	
-		_authority[i].print(i);
+		_authority[i]->print(i);
 	}
 	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END AUTHORITY^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
@@ -755,7 +764,7 @@ void DNSMessage::print(){
 	
 	for(uint16_t i = 0; i < _hdr._numAdditRR; i++){
 	
-		_additional[i].print(i);
+		_additional[i]->print(i);
 	}
 	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END ADDITIONAL^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END DNSMESSAGE^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;

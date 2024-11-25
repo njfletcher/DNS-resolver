@@ -18,7 +18,7 @@ using namespace std;
 vector<uint16_t> takenIds;
 vector<pair<string,string> > safety;
 
-unordered_map<string, list<ResourceRecord>> cache;
+unordered_map<string, list< std::shared_ptr<ResourceRecord> > > cache;
 
 uint16_t pickNextId(){
 	
@@ -113,8 +113,8 @@ void insertRecordIntoCache(ResourceRecord& r){
 
 	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
 	if(r._ttl > 0){
-		list<ResourceRecord>& records = cache[r._realName()];
-		records.push_back(r);
+		list<shared_ptr<ResourceRecord> >& records = cache[r._realName()];
+		records.push_back();
 	}
 
 }
@@ -122,9 +122,9 @@ void insertRecordIntoCache(ResourceRecord& r){
 list<ResourceRecord> getRecordsFromCache(string domainName){
 
 	if(cache.find(domainName) != cache.end()){
-		list<ResourceRecord>& records = cache[r._realName];
+		list<shared_ptr<ResourceRecord> >& records = cache[r._realName];
 		for(auto iter = records.begin(); iter < records.end(); iter++){
-			ResourceRecord r = *iter;
+			shared_ptr<ResourceRecord> r = *iter;
 			if(r._cacheExpireTime < time(NULL)){
 				records.erase(iter);
 			}
@@ -203,6 +203,61 @@ bool QueryState::checkForResponseErrors(DNSMessage& resp){
 
 }
 
+void QueryState::expandAnswers(shared_ptr<ResourceRecord> r){
+	
+	if(r->_rType != (uint16_t) ResourceTypes::a){
+		return;
+	}
+	
+	_answers.push_back(r->getDataAsString());
+	
+
+}
+
+void QueryState::expandNextServers(shared_ptr<ResourceRecord> r){
+
+	if(r->_rType != (uint16_t) ResourceTypes::ns){
+		return;
+	}
+
+	string domainName = r->getDataAsString();
+	vector<QueryState>& servs = _nextServers;
+				
+	//dont want to add the same domain name of a name server multiple times if there are multiple ns records.
+	bool isUniqueName = true;
+	for (auto servIter = servs.begin(); servIter < servs.end(); servIter++){
+		if(servIter->_sname == domainName){
+			isUniqueName = false;
+			break;
+					
+		}
+	}
+				
+	if(isUniqueName) _nextServers.push_back(QueryState(domainName, _stype, _sclass));
+
+
+}
+
+void QueryState::expandNextServerAnswer(shared_ptr<ResourceRecord> r){
+
+	if(r->_rType != (uint16_t) ResourceTypes::a){
+		return;
+	}
+	
+	string domainName = r->_realName;
+	vector<QueryState>& servs = _nextServers;
+				
+	for (auto servIter = servs.begin(); servIter < servs.end(); servIter++){
+		if(servIter->_sname == domainName){
+			servIter->answers.push_back(r->getDataAsString());
+					
+		}
+	}
+				
+}
+
+
+
 void QueryState::extractDataFromResponse(DNSMessage& msg){
 
 
@@ -216,10 +271,8 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 	if(numAnswersClaim > 0){
 		
 		for(size_t i =0; i < numAnswersActual; i++){
-			ResourceRecord r = msg._answer[i];
-			if(r._rType == (uint16_t) ResourceTypes::a){
-				_answers.push_back(r);
-			}
+			shared_ptr<ResourceRecord> r = msg._answer[i];
+			expandAnswers(r);
 		
 		}
 		
@@ -232,15 +285,10 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 	uint16_t numAuthClaim = msg._hdr._numAuthRR;
 	size_t numAuthActual = msg._authority.size();
 	if(numAuthClaim > 0){
-	
 		for(size_t i =0; i < numAuthActual; i++){
-			ResourceRecord r = msg._authority[i];
-			if(r._rType == (uint16_t) ResourceTypes::a){
-				_answers.push_back(r);
-			}
-			if(r._rType == (uint16_t) ResourceTypes::ns){
-				_answers.push_back(r);
-			}
+			shared_ptr<ResourceRecord> r = msg._authority[i];
+			expandNextServerAnswer(r);
+			expandNextServers(r);
 		}
 	
 	}
@@ -250,8 +298,8 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 	if(numAdditClaim > 0){
 		
 		for(size_t i =0; i < numAdditActual; i++){
-			ResourceRecord r = msg._additional[i];
-			r.affectNextServersData(this);
+			shared_ptr<ResourceRecord> r = msg._additional[i];
+			expandNextServerAnswer(r);
 		
 		}
 		
@@ -323,12 +371,12 @@ void solveStandardQuery(QueryState& query){
 	query._readyForUse = false;
 
 	//check cache directly for answers for this query. If we find any, we are done.
-	list<ResourceRecord> directCached = getRecordsFromCache(query._sname);
+	list<shared_ptr<ResourceRecord> > directCached = getRecordsFromCache(query._sname);
 	
 	for(auto iter = directCached.begin(); iter < directCached.end(); iter++){
 	
-		ResourceRecord r = *iter;
-		r.affectAnswers(&query);
+		shared_ptr<ResourceRecord> r = *iter;
+		query.expandAnswers(r);
 		
 	}
 	
@@ -359,8 +407,8 @@ void solveStandardQuery(QueryState& query){
 	
 		for(auto iter = directCached.begin(); iter < directCached.end(); iter++){
 	
-			ResourceRecord r = *iter;
-			r.affectNextServersNames(&query);
+			shared_ptr<ResourceRecord> r = *iter;
+			query.expandNextServers(r);
 	
 	
 		}
@@ -375,12 +423,12 @@ void solveStandardQuery(QueryState& query){
 		QueryState& inf = *nsIter;
 		string currDomain = inf._sname;
 		
-		list<ResourceRecord> matchCached = getRecordsFromCache(currDomain);
+		list<shared_ptr<ResourceRecord> > matchCached = getRecordsFromCache(currDomain);
 		
 		for(auto iter = matchCached.begin(); iter < matchCached.end(); iter++){
 
-			ResourceRecord r = *iter;
-			r.affectNextServersData(&query);
+			shared_ptr<ResourceRecord> r = *iter;
+			inf.expandAnswers(r);
 			
 		}		
 		
@@ -390,11 +438,10 @@ void solveStandardQuery(QueryState& query){
 	
 	// start multithreaded resolution of the name servers we want to investigate but dont have an ip for
 	
-	vector<NameServerInfo>& nextServers = query._nextServers;
+	vector<QueryState>& nextServers = query._nextServers;
 	for(auto nsIter = nextServers.begin(); nsIter < nextServers.end(); nsIter++){
 	
 		QueryState& inf = *nsIter;
-		
 		
 		if(inf._answers.size() < 1){
 		
@@ -423,7 +470,7 @@ void solveStandardQuery(QueryState& query){
 	//one thread devoted to each nameserver for resolving the current query.
 	//if a nameserver does not yet have an address(and it isnt currently being investigated by threads from above), use the nameserver's thread to resolve its address.
 	//if a nameserver has multiple ips on record, they are all investigated on the same thread for simplicity.
-	vector<NameServerInfo>& nsServers = query._nextServers;
+	vector<QueryState>& nsServers = query._nextServers;
 	for(auto nsIter = nsServers.begin(); nsIter < nsServers.end(); nsIter++){
 	
 		pid_t pid = fork();
@@ -444,8 +491,11 @@ void solveStandardQuery(QueryState& query){
 					solveStandardQuery(inf);
 				}
 				else{
-					vector<ResourceRecords
-					for(auto ansIter = 
+					
+					for(auto ansIter = inf._answers.begin(); ansIter < inf._answers.end(); ansIter++){
+						sendStandardQuery(*ansIter, QueryState& state)
+						
+					}
 				
 				}
 			

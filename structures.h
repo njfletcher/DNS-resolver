@@ -49,8 +49,6 @@ class DNSHeader {
 };
 
 
-std::string convertOctetSeqToString(const std::vector<uint8_t> & nameSequence);
-
 class QuestionRecord{
 
 	public:
@@ -80,9 +78,7 @@ class ResourceRecord{
 		std::time_t _cacheExpireTime; //absolute expiration time used by cache
 		uint16_t _rdLength; //specified in octets
 		std::vector<uint8_t> _rData; //length of rdLength, not null terminated
-		void* _convData;
 				
-		~ResourceRecord();
 		ResourceRecord();
 		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
 		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
@@ -90,22 +86,45 @@ class ResourceRecord{
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print(uint16_t number);
 		
-		std::string getDataAsString();
-		void convertRData();
+		virtual std::string getDataAsString();
+		virtual void convertRData() = 0;
 
 };
+
+class NSResourceRecord: public ResourceRecord {
+	public:
+		std::string getDataAsString();
+		void convertRData();
+		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		
+	private:
+		std::string _domain;
+}
+class AResourceRecord: public ResourceRecord {
+	public:
+		std::string getDataAsString();
+		void convertRData();
+		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		
+	private:
+		uint32_t _ip;
+}
+
+
+
+
 
 class DNSMessage{
 
 	public:
 		DNSHeader _hdr;
 		std::vector<QuestionRecord> _question;// one or more questions for the name server to answer
-		std::vector<ResourceRecord> _answer; // zero or more resource records that answer the query
-		std::vector<ResourceRecord> _authority;//zero or more resource records that point to authoritative name servers
-		std::vector<ResourceRecord> _additional; // zero or more resource records that are strictly not answers
+		std::vector<shared_ptr<ResourceRecord> > _answer; // zero or more resource records that answer the query
+		std::vector<shared_ptr<ResourceRecord> > _authority;//zero or more resource records that point to authoritative name servers
+		std::vector<shared_ptr<ResourceRecord> > _additional; // zero or more resource records that are strictly not answers
 		
 		DNSMessage();
-		DNSMessage(const DNSHeader& hdr, std::vector<QuestionRecord>& question, std::vector<ResourceRecord>& answer, std::vector<ResourceRecord>& authority, std::vector<ResourceRecord>& additional);
+		DNSMessage(const DNSHeader& hdr, std::vector<QuestionRecord>& question, std::vector<std::shared_ptr<ResourceRecord> >& answer, std::vector<std::shared_ptr<ResourceRecord> >& authority, std::vector<std::shared_ptr<ResourceRecord> >& additional);
 		DNSMessage(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end);
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void print();
