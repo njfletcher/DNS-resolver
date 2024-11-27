@@ -8,7 +8,10 @@
 #include <vector>
 #include <ctime>
 
-#define perRequestOpCap 10
+
+//operation capping to make sure threads dont go out of control or network errors cause program to run forever.
+//a thread spawn or network request is one operation decrement
+#define perQueryOpCap 10
 #define perSequenceOpCap 1000
 
 
@@ -102,14 +105,7 @@ class QueryState{
 		//name servers this request thinks will be helpful
 		vector<QueryState> _nextServers;
 		
-		//number of operations left for this specific request until failure
-		//0 means termination. This could be from exhausting ops, finding answers, or fatal errors.
-		unsigned int _numOpsLocalLeft;
-		
-		//number of operations left for the series of requests that led to this one until failure
-		//0 means sequence has terminated. Same reasons as above.
-		std::shared_ptr<unsigned int> _numOpsGlobal;
-		
+				
 		//absolute time the request started
 		uint16_t _startTime;
 		
@@ -118,32 +114,27 @@ class QueryState{
 		
 		int _networkCode;
 		uint8_t _msgCode;
-
+		
+		//number of operations left for this specific request until failure
+		//0 means termination. This could be from exhausting ops, finding answers, or fatal errors.
+		unsigned int _numOpsLocalLeft;
+		
 		~QueryState();
-		//for an original query
-		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
-		//for follow ups that spawn from an original
-		QueryState(std::string sname, uint16_t stype, uint16_t sclass, std::shared_ptr<int> globalOps);
+		QueryState(std::string sname, uint16_t stype, uint16_t sclass, bool isRoot);
 		
 		void expandAnswers(shared_ptr<ResourceRecord> r);
 		void expandNextServerAnswer(shared_ptr<ResourceRecord> r);
 		void expandNextServers(shared_ptr<ResourceRecord> r);
 		
-		
 	private:
-		void matchAnswerToNextServers(ResourceRecord& r);
-		void addNextServer(ResourceRecord& ns);
 		void extractDataFromResponse(DNSMessage& msg);
 		void cacheRecords(DNSMessage& msg);
 		bool checkForResponseErrors(DNSMessage& msg);
 		
-		
-
 };
 
 void loadSafeties(std::string filePath);
 void solveStandardQuery(QueryState query);
-void verifyRootNameServers(std::vector<std::pair<std::string,std::string> >& servers);
 
 
 
