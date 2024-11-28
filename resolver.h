@@ -7,6 +7,8 @@
 #include "structures.h"
 #include <vector>
 #include <ctime>
+#include <mutex>
+#include <thread>
 
 
 //operation capping to make sure threads dont go out of control or network errors cause program to run forever.
@@ -119,8 +121,17 @@ class QueryState{
 		//0 means termination. This could be from exhausting ops, finding answers, or fatal errors.
 		unsigned int _numOpsLocalLeft;
 		
+		std::shared_ptr<std::mutex> _opMutex;
+		std::shared_ptr<std::mutex> _servMutex;
+		std::shared_ptr<std::mutex> _ansMutex;
+		
+		//number of operations left for the series of requests that led to this one until failure
+		//0 means sequence has terminated. Same reasons as above.
+		std::shared_ptr<unsigned int> _numOpsGlobalLeft;
+		
 		~QueryState();
-		QueryState(std::string sname, uint16_t stype, uint16_t sclass, bool isRoot);
+		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
+		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState& q);
 		
 		void expandAnswers(shared_ptr<ResourceRecord> r);
 		void expandNextServerAnswer(shared_ptr<ResourceRecord> r);

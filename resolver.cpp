@@ -11,23 +11,19 @@
 #include <arpa/inet.h>
 #include <unordered_map>
 #include <unistd.h> 
-#include <list>
 #include <mutex>
 #include <thread>
 
 using namespace std;
 
-vector<uint16_t> takenIds();
 vector<pair<string,string> > safety;
-std::mutex opMutex;
+
 std::mutex idMutex;
+vector<uint16_t> takenIds();
+
 std::mutex cacheMutex;
+unordered_map<string, vector< std::shared_ptr<ResourceRecord> > > cache();
 
-//number of operations left for the series of requests that led to this one until failure
-//0 means sequence has terminated. Same reasons as above.
-unsigned int numOpsGlobalLeft = perSequenceOpCap;
-
-unordered_map<string, list< std::shared_ptr<ResourceRecord> > > cache();
 
 uint16_t pickNextId(){
 	
@@ -68,14 +64,33 @@ QueryState::~QueryState(){
 
 }
 
-QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass, bool isRoot): _id(id), _sname(sname), _stype(stype), _sclass(sclass){ 
+QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass): _id(id), _sname(sname), _stype(stype), _sclass(sclass){ 
 
-	if(isRoot){
-		_numOpsLocalLeft = perSequenceOpCap;
-	}
-	else{
-		_numOpsLocalLeft = perQueryOpCap;
-	}
+	
+	_numOpsLocalLeft = perSequenceOpCap;
+	_numOpsGlobalLeft = make_shared<unsigned int>(perSequenceOpCap);
+	
+	_opMutex = make_shared<std::mutex>();
+	_ansMutex = make_shared<std::mutex>();
+	_servMutex = make_shared<std::mutex>();
+	
+	_readyForUse = true;
+	_networkCode = (int) NetworkErrors::none;
+	_msgCode = (uint8_t) ResponseCodes::none;
+	_startTime = time(NULL);
+	_id = pickNextId();
+}
+
+QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState& q): _id(id), _sname(sname), _stype(stype), _sclass(sclass){ 
+
+	_numOpsLocalLeft = perQueryOpCap;
+	
+	//shared pointer reference counts are thread safe, so dont need to guard anything for copying
+	_opMutex = q._opMutex;
+	_ansMutex = q._ansMutex;
+	_servMutex = q._servMutex;
+	
+	_numGlobalOpsLeft = q._numGlobalOpsLeft;
 	
 	_readyForUse = true;
 	_networkCode = (int) NetworkErrors::none;
@@ -124,21 +139,21 @@ void insertRecordIntoCache(ResourceRecord& r){
 	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
 	if(r._ttl > 0){
 		cacheMutex.lock();
-		list<shared_ptr<ResourceRecord> >& records = cache[r._realName()];
+		vector<shared_ptr<ResourceRecord> >& records = cache[r._realName()];
 		records.push_back();
 		cacheMutex.unlock();
 	}
 
 }
 
-list<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
+//this method does not have mutex locking in it. the calling context is expected to lock instead in order to use the returned vector of records safely
+vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 
-	list<shared_ptr<ResourceRecord> >* lr = NULL;
+	vector<shared_ptr<ResourceRecord> >* lr = NULL;
 	
-	cacheMutex.lock();
 	if(cache.find(domainName) != cache.end()){
 	
-		list<shared_ptr<ResourceRecord> >& records = cache[r._realName];
+		vector<shared_ptr<ResourceRecord> >& records = cache[r._realName];
 		
 		for(auto iter = records.begin(); iter < records.end(); iter++){
 			shared_ptr<ResourceRecord> r = *iter;
@@ -150,7 +165,6 @@ list<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 		
 		lr = &records;
 	}
-	cacheMutex.unlock();
 	return lr;
 	
 
@@ -239,7 +253,9 @@ void QueryState::expandAnswers(shared_ptr<ResourceRecord> r){
 		return;
 	}
 	
+	_ansMutex.lock();
 	_answers.push_back(r->getDataAsString());
+	_ansMutex.unlock();
 	
 
 }
@@ -254,6 +270,7 @@ void QueryState::expandNextServers(shared_ptr<ResourceRecord> r){
 	vector<QueryState>& servs = _nextServers;
 				
 	//dont want to add the same domain name of a name server multiple times if there are multiple ns records.
+	_servMutex->lock();
 	bool isUniqueName = true;
 	for (auto servIter = servs.begin(); servIter < servs.end(); servIter++){
 		if(servIter->_sname == domainName){
@@ -261,9 +278,9 @@ void QueryState::expandNextServers(shared_ptr<ResourceRecord> r){
 			break;
 					
 		}
-	}
-				
-	if(isUniqueName) _nextServers.emplace_back(domainName, _stype, _sclass, false);
+	}			
+	if(isUniqueName) _nextServers.emplace_back(domainName, _stype, _sclass, *this);
+	_servMutex->unlock();
 
 
 }
@@ -277,13 +294,15 @@ void QueryState::expandNextServerAnswer(shared_ptr<ResourceRecord> r){
 	string domainName = r->_realName;
 	vector<QueryState>& servs = _nextServers;
 				
+	_servMutex->lock();
 	for (auto servIter = servs.begin(); servIter < servs.end(); servIter++){
 		if(servIter->_sname == domainName){
-			servIter->answers.push_back(r->getDataAsString());
+			servIter->expandAnswers(r);
 					
 		}
 	}
-				
+	_servMutex->unlock();
+		
 }
 
 
@@ -344,23 +363,23 @@ void decrementOps(QueryState& q){
 		opsL = opsL - 1;
 	}
 
-	queryMutex.lock();
+	q._opMutex->lock();
 	
-	unsigned int& opsG = numGlobalOpsLeft;
+	unsigned int& opsG = *(q._numGlobalOpsLeft);
 	if(opsG > 0){
 		opsG = opsG - 1;
 	}
 	
-	queryMutex.unlock();
+	q._opMutex->unlock();
 
 }
 
 bool haveOpsLeft(QueryState& q){
 
 	unsigned int gOps;
-	queryMutex.lock();
-	gOps = numOpsGlobalLeft;
-	queryMutex.unlock();
+	q._opMutex->lock();
+	gOps = *(q._numOpsGlobalLeft);
+	q._opMutex->unlock();
 	
 	if(state._numOpsLocalLeft < 1 || gOps < 1){
 		return false;
@@ -434,6 +453,7 @@ void solveStandardQuery(QueryState& query){
 	query._readyForUse = false;
 
 	//check cache directly for answers for this query. If we find any, we are done.
+	cacheMutex->lock();
 	list<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query._sname);
 	if(directCached != NULL){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
@@ -442,11 +462,16 @@ void solveStandardQuery(QueryState& query){
 			query.expandAnswers(r);
 		
 		}
+	}
+	cacheMutex->unlock();
 	
-		if(query._answers.size() > 0){
-			query._readyForUse = true; 
-			return; 
-		}
+	query.ansMutex->lock();
+	size_t ansSize = query._answers.size();
+	query.ansMutex->unlock();
+	
+	if(ansSize > 0){
+		query._readyForUse = true; 
+		return; 
 	}
 	
 	vector<string> splits;
@@ -466,9 +491,8 @@ void solveStandardQuery(QueryState& query){
 		
 		}
 		
-		
-		list<shared_ptr<ResourceRecord> >* indirectCached = getRecordsFromCache(currDomain);
-	
+		cacheMutex->lock();
+		vector<shared_ptr<ResourceRecord> >* indirectCached = getRecordsFromCache(currDomain);
 		if(indirectCached != NULL){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
@@ -476,91 +500,59 @@ void solveStandardQuery(QueryState& query){
 				query.expandNextServers(r);
 			}
 		}
+		cacheMutex->unlock();
 	
 	}
-	
-	//try to match addresses to these name servers we just identified.
-
-	vector<QueryState>& servs = query._nextServers;
-	for(auto nsIter = servs.begin(); nsIter < servs.end(); nsIter++){
-	
-		QueryState& inf = *nsIter;
-		string currDomain = inf._sname;
 		
-		list<shared_ptr<ResourceRecord> >* matchCached = getRecordsFromCache(currDomain);
-		
-		if(matchCached != NULL){
-			for(auto iter = matchCached->begin(); iter < matchCached->end(); iter++){
-
-				shared_ptr<ResourceRecord> r = *iter;
-				inf.expandAnswers(r);
-			
-			}
-		}		
-		
-	}
-	
-	
-	
-	// start multithreaded resolution of the name servers we want to investigate but dont have an ip for
-	vector<QueryState>& nextServers = query._nextServers;
-	for(auto nsIter = nextServers.begin(); nsIter < nextServers.end(); nsIter++){
-	
-		QueryState& inf = *nsIter;
-		
-		if(inf._answers.size() < 1){
-		
-			decrementOps(query);
-			if(haveOpsLeft()){
-		
-				pid_t pid = fork();
-			 
-				if(pid < 0){
-			 
-					exit(EXIT_FAILURE);
-				}
-				//child process will resolve name server answer in background
-				//parent process will keep looping and eventually continue on to asking name servers(whose ips are being resolved in the background) for its own answer.
-				else if (pid == 0){
-			
-					solveStandardQuery(inf);
-					exit(0);
-			 
-				}
-			}
-			else return;	 
-		}	
-	}
-	
-	
-	
 	//one thread devoted to each nameserver for resolving the current query.
-	//if a nameserver does not yet have an address(and it isnt currently being investigated by threads from above), use the nameserver's thread to resolve its address.
+	//if a nameserver does not yet have an address, use the nameserver's thread to resolve its address.
 	//if a nameserver has multiple ips on record, they are all investigated on the same thread for simplicity.
 	vector<QueryState>& nsServers = query._nextServers;
-	for(auto nsIter = nsServers.begin(); nsIter < nsServers.end(); nsIter++){
+	size_t servIndex = 0;
 	
+	while(true){
+	
+		query._servMutex->lock();
+		size_t servSize = nsServers.size();
+		if(servIndex >= servSize){
+			servIndex = 0;
+			query._servMutex->unlock();
+			continue;
+		}
+		QueryState& currS = nsServers[servIndex];
+		query._servMutex->unlock();
+		
 		decrementOps(query);
 		if(haveOpsLeft()){
-			pid_t pid = fork();
-			 
+		
+			pid_t pid = fork();		 
 			if(pid < 0){
 				exit(EXIT_FAILURE);
 			}
 			else if (pid == 0){
 		
-				QueryState& inf = *nsIter;
+				if(currS._readyForUse){
 			
-				if(inf._readyForUse){
-			
-					//ready for use yet no answers available. This means it got added on the fly and still needs an address
-					if(inf._answers.size() < 1){
-						solveStandardQuery(inf);
+					if(currS._answers.size() < 1){
+						solveStandardQuery(currS);
 					}
 					else{
 					
-						for(auto ansIter = inf._answers.begin(); ansIter < inf._answers.end(); ansIter++){
-							sendStandardQuery(*ansIter, query);
+						vector<string>& nsAns = currs._answers;
+						size_t ansIndex = 0;
+						while(true){
+						
+							currS._ansMutex->lock();
+							size_t ansSize = nsAns.size();
+							if(ansIndex >= ansSize){
+								currS._ansMutex->unlock();
+								break;
+							}
+							string ans = nsAns[ansIndex];
+							currS._ansMutex->unlock();
+							
+							sendStandardQuery(ans, query);
+							ansIndex++;
 							
 						}
 				
@@ -572,9 +564,11 @@ void solveStandardQuery(QueryState& query){
 			}
 			 
 		}
-		else return;
-			
+		
+		servIndex++;
+
 	}
+
 	
 }
 
