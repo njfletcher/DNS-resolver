@@ -19,10 +19,10 @@ using namespace std;
 vector<pair<string,string>> safety;
 
 std::mutex idMutex;
-vector<uint16_t> takenIds();
+vector<uint16_t> takenIds;
 
 std::mutex cacheMutex;
-unordered_map<string, vector< std::shared_ptr<ResourceRecord> > > cache();
+unordered_map<string, vector< std::shared_ptr<ResourceRecord> > > cache;
 
 
 uint16_t pickNextId(){
@@ -42,12 +42,12 @@ void reclaimId(uint16_t id){
 	
 	idMutex.lock();
 	auto iter = takenIds.begin();
-	bool found = false
+	bool found = false;
 	for(; iter < takenIds.end(); iter++){
 		if(*iter == id){
 			found = true;
 			break;
-		{
+		}
 	
 	}
 	
@@ -64,11 +64,11 @@ QueryState::~QueryState(){
 
 }
 
-QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass): _id(id), _sname(sname), _stype(stype), _sclass(sclass){ 
+QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sname), _stype(stype), _sclass(sclass){ 
 
 	
 	_numOpsLocalLeft = perSequenceOpCap;
-	_numOpsGlobalLeft = make_shared<unsigned int>(perSequenceOpCap);
+	 _numOpsGlobalLeft = make_shared<unsigned int>(perSequenceOpCap);
 	
 	_opMutex = make_shared<std::mutex>();
 	_ansMutex = make_shared<std::mutex>();
@@ -81,7 +81,7 @@ QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass): _id(
 	_id = pickNextId();
 }
 
-QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState& q): _id(id), _sname(sname), _stype(stype), _sclass(sclass){ 
+QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState& q): _sname(sname), _stype(stype), _sclass(sclass){ 
 
 	_numOpsLocalLeft = perQueryOpCap;
 	
@@ -90,7 +90,7 @@ QueryState::QueryState(std::string sname, uint16_t stype, uint16_t sclass, Query
 	_ansMutex = q._ansMutex;
 	_servMutex = q._servMutex;
 	
-	_numGlobalOpsLeft = q._numGlobalOpsLeft;
+	 _numOpsGlobalLeft = q._numOpsGlobalLeft;
 	
 	_readyForUse = true;
 	_networkCode = (int) NetworkErrors::none;
@@ -134,13 +134,13 @@ void loadSafeties(string filePath){
 
 
 
-void insertRecordIntoCache(ResourceRecord& r){
+void insertRecordIntoCache(shared_ptr<ResourceRecord>& r){
 
 	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
-	if(r._ttl > 0){
+	if(r->_ttl > 0){
 		cacheMutex.lock();
-		vector<shared_ptr<ResourceRecord> >& records = cache[r._realName()];
-		records.push_back();
+		vector<shared_ptr<ResourceRecord> >& records = cache[r->_realName];
+		records.push_back(r);
 		cacheMutex.unlock();
 	}
 
@@ -153,11 +153,11 @@ vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 	
 	if(cache.find(domainName) != cache.end()){
 	
-		vector<shared_ptr<ResourceRecord> >& records = cache[r._realName];
+		vector<shared_ptr<ResourceRecord> >& records = cache[domainName];
 		
 		for(auto iter = records.begin(); iter < records.end(); iter++){
 			shared_ptr<ResourceRecord> r = *iter;
-			if(r._cacheExpireTime < time(NULL)){
+			if(r->_cacheExpireTime < time(NULL)){
 				records.erase(iter);
 			}
 		
@@ -172,28 +172,28 @@ vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 
 
 //assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
-QueryState::cacheRecords(DNSMessage& msg){
+void QueryState::cacheRecords(DNSMessage& msg){
 
 	for(auto iter = msg._answer.begin(); iter < msg._answer.end(); iter++){
 	
-		ResourceRecord& r = *iter;
-		r._cacheExpireTime = _startTime + r._ttl;
+		shared_ptr<ResourceRecord>& r = *iter;
+		r->_cacheExpireTime = _startTime + r->_ttl;
 		insertRecordIntoCache(r);
 	
 	}
 	
 	for(auto iter = msg._authority.begin(); iter < msg._authority.end(); iter++){
 	
-		ResourceRecord& r = *iter;
-		r._cacheExpireTime = _startTime + r._ttl;
+		shared_ptr<ResourceRecord>& r = *iter;
+		r->_cacheExpireTime = _startTime + r->_ttl;
 		insertRecordIntoCache(r);
 	
 	}
 	
 	for(auto iter = msg._additional.begin(); iter < msg._additional.end(); iter++){
 	
-		ResourceRecord& r = *iter;
-		r._cacheExpireTime = _startTime + r._ttl;
+		shared_ptr<ResourceRecord>& r = *iter;
+		r->_cacheExpireTime = _startTime + r->_ttl;
 		insertRecordIntoCache(r);
 	
 	}
@@ -233,10 +233,10 @@ bool QueryState::checkForResponseErrors(DNSMessage& resp){
 
 }
 
-bool QueryState::checkForFatalErrors(QueryState& q){
+bool QueryState::checkForFatalErrors(){
 
 
-	if(q._msgCode == (uint8_t) ResponseCodes::name){
+	if(_msgCode == (uint8_t) ResponseCodes::name){
 	
 		return true;
 	
@@ -250,9 +250,9 @@ bool QueryState::checkForFatalErrors(QueryState& q){
 
 void QueryState::expandAnswers(string answer){
 		
-	_ansMutex.lock();
+	_ansMutex->lock();
 	_answers.push_back(answer);
-	_ansMutex.unlock();
+	_ansMutex->unlock();
 	
 
 }
@@ -299,8 +299,8 @@ void QueryState::expandNextServerAnswer(string domainName, string answer){
 void QueryState::extractDataFromResponse(DNSMessage& msg){
 
 
-	if(checkForResponseErrors()) return;
-	else cacheRecords();
+	if(checkForResponseErrors(msg)) return;
+	else cacheRecords(msg);
 	
 	
 	uint16_t numAnswersClaim = msg._hdr._numAnswers;
@@ -346,14 +346,14 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 
 void decrementOps(QueryState& q){
 
-	unsigned int& opsL = q._numLocalOpsLeft;
+	unsigned int& opsL = q._numOpsLocalLeft;
 	if(opsL > 0){
 		opsL = opsL - 1;
 	}
 
 	q._opMutex->lock();
 	
-	unsigned int& opsG = *(q._numGlobalOpsLeft);
+	unsigned int& opsG = *(q._numOpsGlobalLeft);
 	if(opsG > 0){
 		opsG = opsG - 1;
 	}
@@ -385,11 +385,11 @@ void sendStandardQuery(string nameServerIp, QueryState& state){
 	
 	
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
-	DNSHeader hdr(id, flg, 1, 0, 0,0);
+	DNSHeader hdr(state._id, flg, 1, 0, 0,0);
 	QuestionRecord q(state._sname.c_str(), state._stype , state._sclass );
 	
 	vector<QuestionRecord> qr = {q};
-	vector<ResourceRecord> rr;
+	vector<shared_ptr<ResourceRecord>> rr;
 	DNSMessage msg(hdr, qr, rr, rr, rr );
 	
 	vector<uint8_t> buff;
@@ -400,7 +400,7 @@ void sendStandardQuery(string nameServerIp, QueryState& state){
 	
 	state._networkCode = networkResult;
 	
-	if(networkResult == (int) NetworkCodes::none){
+	if(networkResult == (int) NetworkErrors::none){
 		auto iter = resp.begin();
 		DNSMessage msg = DNSMessage(iter, iter, resp.end());
 		state._msgCode = msg._hdr._flags._rcode;
@@ -442,7 +442,7 @@ void solveStandardQuery(QueryState& query){
 	query._readyForUse = false;
 
 	//check cache directly for answers for this query. If we find any, we are done.
-	cacheMutex->lock();
+	cacheMutex.lock();
 	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query._sname);
 	if(directCached != NULL){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
@@ -452,11 +452,11 @@ void solveStandardQuery(QueryState& query){
 		
 		}
 	}
-	cacheMutex->unlock();
+	cacheMutex.unlock();
 	
-	query.ansMutex->lock();
+	query._ansMutex->lock();
 	size_t ansSize = query._answers.size();
-	query.ansMutex->unlock();
+	query._ansMutex->unlock();
 	
 	if(ansSize > 0){
 		query._readyForUse = true; 
@@ -480,16 +480,16 @@ void solveStandardQuery(QueryState& query){
 		
 		}
 		
-		cacheMutex->lock();
+		cacheMutex.lock();
 		vector<shared_ptr<ResourceRecord> >* indirectCached = getRecordsFromCache(currDomain);
 		if(indirectCached != NULL){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
 				shared_ptr<ResourceRecord> r = *iter;
-				r.affectNameServers(query);
+				r->affectNameServers(query);
 			}
 		}
-		cacheMutex->unlock();
+		cacheMutex.unlock();
 	
 	}
 	
@@ -498,7 +498,7 @@ void solveStandardQuery(QueryState& query){
 	
 		pair<string, string> safeNs = *safetyIter;
 		query.expandNextServers(safeNs.second);
-		query.expandNextServersAnswer(safeNs.second, safeNs.first);
+		query.expandNextServerAnswer(safeNs.second, safeNs.first);
 	
 	}
 		
@@ -536,7 +536,7 @@ void solveStandardQuery(QueryState& query){
 					}
 					else{
 					
-						vector<string>& nsAns = currs._answers;
+						vector<string>& nsAns = currS._answers;
 						size_t ansIndex = 0;
 						while(true){
 						

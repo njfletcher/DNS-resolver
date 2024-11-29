@@ -16,6 +16,7 @@
 #define perQueryOpCap 10
 #define perSequenceOpCap 1000
 
+class DNSMessage;
 
 enum class SessionStates{
 
@@ -105,14 +106,14 @@ class QueryState{
 		uint16_t _sclass;
 		
 		//name servers this request thinks will be helpful
-		vector<QueryState> _nextServers;
+		std::vector<QueryState> _nextServers;
 		
 				
 		//absolute time the request started
 		uint16_t _startTime;
 		
 		//answers received for this query
-		vector<std::string> _answers;
+		std::vector<std::string> _answers;
 		
 		int _networkCode;
 		uint8_t _msgCode;
@@ -139,16 +140,17 @@ class QueryState{
 				
 		bool haveLocalOpsLeft();
 		bool haveGlobalOpsLeft();
+		void extractDataFromResponse(DNSMessage& msg);
 		
 	private:
-		void extractDataFromResponse(DNSMessage& msg);
+		bool checkForFatalErrors();
 		void cacheRecords(DNSMessage& msg);
 		bool checkForResponseErrors(DNSMessage& msg);
 		
 };
 
 void loadSafeties(std::string filePath);
-void solveStandardQuery(QueryState query);
+void solveStandardQuery(QueryState& query);
 
 
 

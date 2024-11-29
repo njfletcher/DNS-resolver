@@ -6,6 +6,8 @@
 #include <bitset>
 #include "resolver.h"
 #include <ctime>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 using namespace std;
 
@@ -679,7 +681,7 @@ DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, v
 shared_ptr<ResourceRecord> GetCorrectResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
 
 	vector<uint8_t>::iterator locIter = iter;
-	ResourceRecord r = ResourceRecord(start, locIter, end);
+	ResourceRecord r = ResourceRecord(start, locIter, end, succeeded);
 	
 	if(r._rType == (uint16_t) ResourceTypes::a){
 		
@@ -750,7 +752,7 @@ void DNSMessage::toBuffer(vector<uint8_t> & buffer){
 	
 	for(uint16_t i = 0; i < _hdr._numAuthRR; i++){
 	
-		_authority[i->toBuffer(buffer);
+		_authority[i]->toBuffer(buffer);
 	}
 	
 	for(uint16_t i = 0; i < _hdr._numAdditRR; i++){

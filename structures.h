@@ -5,8 +5,11 @@
 #include <string>
 #include <iterator>
 #include <ctime>
+#include "resolver.h"
 
 #define maxDomainNameLen 255
+
+class QueryState;
 
 class DNSFlags{
 
@@ -87,7 +90,6 @@ class ResourceRecord{
 		void print(uint16_t number);
 		
 		virtual std::string getDataAsString();
-		virtual void convertRData() = 0;
 		void affectAnswers(QueryState& q);
 		void affectNameServers(QueryState& q);
 		
@@ -97,14 +99,15 @@ class ResourceRecord{
 class NSResourceRecord: public ResourceRecord {
 	public:
 		std::string getDataAsString();
-		void convertRData();
+		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
 		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		void affectAnswers(QueryState& q);
 		void affectNameServers(QueryState& q);
 		
 	private:
 		std::string _domain;
-}
+};
+
 class AResourceRecord: public ResourceRecord {
 	public:
 		std::string getDataAsString();
@@ -115,9 +118,7 @@ class AResourceRecord: public ResourceRecord {
 		
 	private:
 		uint32_t _ip;
-}
-
-
+};
 
 
 
@@ -126,9 +127,9 @@ class DNSMessage{
 	public:
 		DNSHeader _hdr;
 		std::vector<QuestionRecord> _question;// one or more questions for the name server to answer
-		std::vector<shared_ptr<ResourceRecord> > _answer; // zero or more resource records that answer the query
-		std::vector<shared_ptr<ResourceRecord> > _authority;//zero or more resource records that point to authoritative name servers
-		std::vector<shared_ptr<ResourceRecord> > _additional; // zero or more resource records that are strictly not answers
+		std::vector<std::shared_ptr<ResourceRecord> > _answer; // zero or more resource records that answer the query
+		std::vector<std::shared_ptr<ResourceRecord> > _authority;//zero or more resource records that point to authoritative name servers
+		std::vector<std::shared_ptr<ResourceRecord> > _additional; // zero or more resource records that are strictly not answers
 		
 		DNSMessage();
 		DNSMessage(const DNSHeader& hdr, std::vector<QuestionRecord>& question, std::vector<std::shared_ptr<ResourceRecord> >& answer, std::vector<std::shared_ptr<ResourceRecord> >& authority, std::vector<std::shared_ptr<ResourceRecord> >& additional);
