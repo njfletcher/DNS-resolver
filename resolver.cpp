@@ -257,13 +257,6 @@ void QueryState::expandAnswers(string answer){
 
 }
 
-void QueryState::expandAnswers(shared_ptr<ResourceRecord> r){
-
-	if(r._rType != ResourceTypes::a){
-		return;
-	}
-	expandAnswers(r.getDataAsString());
-}
 
 void QueryState::expandNextServers(string domainName){
 
@@ -284,13 +277,7 @@ void QueryState::expandNextServers(string domainName){
 
 }
 
-void QueryState::expandNextServers(shared_ptr<ResourceRecord> r){
 
-	if(r._rType != ResourceTypes::ns){
-		return;
-	}
-	expandNextServers(r.getDataAsString());
-}
 
 void QueryState::expandNextServerAnswer(string domainName, string answer){
 
@@ -305,15 +292,6 @@ void QueryState::expandNextServerAnswer(string domainName, string answer){
 	}
 	_servMutex->unlock();
 		
-}
-
-void QueryState::expandNextServerAnswer(shared_ptr<ResourceRecord> r){
-
-	if(r._rType != ResourceTypes::a){
-		return;
-	}
-	expandNextServerAnswer(r._realName, r.getDataAsString());
-
 }
 
 
@@ -332,7 +310,7 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 		
 		for(size_t i =0; i < numAnswersActual; i++){
 			shared_ptr<ResourceRecord> r = msg._answer[i];
-			expandAnswers(r);
+			r->affectAnswers(*this);
 		
 		}
 		
@@ -347,8 +325,7 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 	if(numAuthClaim > 0){
 		for(size_t i =0; i < numAuthActual; i++){
 			shared_ptr<ResourceRecord> r = msg._authority[i];
-			expandNextServerAnswer(r);
-			expandNextServers(r);
+			r->affectNameServers(*this);
 		}
 	
 	}
@@ -359,7 +336,7 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 		
 		for(size_t i =0; i < numAdditActual; i++){
 			shared_ptr<ResourceRecord> r = msg._additional[i];
-			expandNextServerAnswer(r);
+			r->affectNameServers(*this);
 		
 		}
 		
@@ -471,7 +448,7 @@ void solveStandardQuery(QueryState& query){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
 			shared_ptr<ResourceRecord> r = *iter;
-			query.expandAnswers(r);
+			r->affectAnswers(query);
 		
 		}
 	}
@@ -509,7 +486,7 @@ void solveStandardQuery(QueryState& query){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
 				shared_ptr<ResourceRecord> r = *iter;
-				query.expandNextServers(r);
+				r.affectNameServers(query);
 			}
 		}
 		cacheMutex->unlock();

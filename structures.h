@@ -88,6 +88,9 @@ class ResourceRecord{
 		
 		virtual std::string getDataAsString();
 		virtual void convertRData() = 0;
+		void affectAnswers(QueryState& q);
+		void affectNameServers(QueryState& q);
+		
 
 };
 
@@ -96,6 +99,8 @@ class NSResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData();
 		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		void affectAnswers(QueryState& q);
+		void affectNameServers(QueryState& q);
 		
 	private:
 		std::string _domain;
@@ -105,6 +110,8 @@ class AResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData();
 		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		void affectAnswers(QueryState& q);
+		void affectNameServers(QueryState& q);
 		
 	private:
 		uint32_t _ip;

@@ -136,11 +136,7 @@ class QueryState{
 		void expandAnswers(std::string answer);
 		void expandNextServerAnswer(std::string server, std::string answer);
 		void expandNextServers(std::string server);
-		
-		void expandAnswers(std::shared_ptr<ResourceRecord> r);
-		void expandNextServerAnswer(std::shared_ptr<ResourceRecord> r);
-		void expandNextServers(std::shared_ptr<ResourceRecord> r);
-		
+				
 		bool haveLocalOpsLeft();
 		bool haveGlobalOpsLeft();
 		
