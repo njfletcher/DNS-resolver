@@ -16,7 +16,7 @@
 
 using namespace std;
 
-vector<pair<string,string> > safety;
+vector<pair<string,string>> safety;
 
 std::mutex idMutex;
 vector<uint16_t> takenIds();
@@ -247,26 +247,26 @@ bool QueryState::checkForFatalErrors(QueryState& q){
 
 }
 
-void QueryState::expandAnswers(shared_ptr<ResourceRecord> r){
-	
-	if(r->_rType != (uint16_t) ResourceTypes::a){
-		return;
-	}
-	
+
+void QueryState::expandAnswers(string answer){
+		
 	_ansMutex.lock();
-	_answers.push_back(r->getDataAsString());
+	_answers.push_back(answer);
 	_ansMutex.unlock();
 	
 
 }
 
-void QueryState::expandNextServers(shared_ptr<ResourceRecord> r){
+void QueryState::expandAnswers(shared_ptr<ResourceRecord> r){
 
-	if(r->_rType != (uint16_t) ResourceTypes::ns){
+	if(r._rType != ResourceTypes::a){
 		return;
 	}
+	expandAnswers(r.getDataAsString());
+}
 
-	string domainName = r->getDataAsString();
+void QueryState::expandNextServers(string domainName){
+
 	vector<QueryState>& servs = _nextServers;
 				
 	//dont want to add the same domain name of a name server multiple times if there are multiple ns records.
@@ -282,27 +282,38 @@ void QueryState::expandNextServers(shared_ptr<ResourceRecord> r){
 	if(isUniqueName) _nextServers.emplace_back(domainName, _stype, _sclass, *this);
 	_servMutex->unlock();
 
-
 }
 
-void QueryState::expandNextServerAnswer(shared_ptr<ResourceRecord> r){
+void QueryState::expandNextServers(shared_ptr<ResourceRecord> r){
 
-	if(r->_rType != (uint16_t) ResourceTypes::a){
+	if(r._rType != ResourceTypes::ns){
 		return;
 	}
-	
-	string domainName = r->_realName;
+	expandNextServers(r.getDataAsString());
+}
+
+void QueryState::expandNextServerAnswer(string domainName, string answer){
+
 	vector<QueryState>& servs = _nextServers;
 				
 	_servMutex->lock();
 	for (auto servIter = servs.begin(); servIter < servs.end(); servIter++){
 		if(servIter->_sname == domainName){
-			servIter->expandAnswers(r);
+			servIter->expandAnswers(answer);
 					
 		}
 	}
 	_servMutex->unlock();
 		
+}
+
+void QueryState::expandNextServerAnswer(shared_ptr<ResourceRecord> r){
+
+	if(r._rType != ResourceTypes::a){
+		return;
+	}
+	expandNextServerAnswer(r._realName, r.getDataAsString());
+
 }
 
 
@@ -374,17 +385,18 @@ void decrementOps(QueryState& q){
 
 }
 
-bool haveOpsLeft(QueryState& q){
+bool QueryState::haveLocalOpsLeft(){
+
+	return (_numOpsLocalLeft >= 1);
+}
+
+bool QueryState::haveGlobalOpsLeft(){
 
 	unsigned int gOps;
-	q._opMutex->lock();
-	gOps = *(q._numOpsGlobalLeft);
-	q._opMutex->unlock();
-	
-	if(state._numOpsLocalLeft < 1 || gOps < 1){
-		return false;
-	}
-	else return true;
+	_opMutex->lock();
+	gOps = *_numOpsGlobalLeft;
+	_opMutex->unlock();
+	return (gOps >= 1);
 
 }
 
@@ -392,7 +404,7 @@ bool haveOpsLeft(QueryState& q){
 void sendStandardQuery(string nameServerIp, QueryState& state){
 
 	decrementOps(state);
-	if(!haveOpsLeft) return;
+	if(!state.haveLocalOpsLeft() || !state.haveGlobalOpsLeft()) return;
 	
 	
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
@@ -454,7 +466,7 @@ void solveStandardQuery(QueryState& query){
 
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex->lock();
-	list<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query._sname);
+	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query._sname);
 	if(directCached != NULL){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
@@ -503,6 +515,15 @@ void solveStandardQuery(QueryState& query){
 		cacheMutex->unlock();
 	
 	}
+	
+	//add safety belt servers on at the end, these are assumed to be correct so no further investigation needed.
+	for(auto safetyIter = safety.begin(); safetyIter < safety.end(); safetyIter++){
+	
+		pair<string, string> safeNs = *safetyIter;
+		query.expandNextServers(safeNs.second);
+		query.expandNextServersAnswer(safeNs.second, safeNs.first);
+	
+	}
 		
 	//one thread devoted to each nameserver for resolving the current query.
 	//if a nameserver does not yet have an address, use the nameserver's thread to resolve its address.
@@ -523,7 +544,7 @@ void solveStandardQuery(QueryState& query){
 		query._servMutex->unlock();
 		
 		decrementOps(query);
-		if(haveOpsLeft()){
+		if(query.haveLocalOpsLeft() && query.haveGlobalOpsLeft()){
 		
 			pid_t pid = fork();		 
 			if(pid < 0){
@@ -562,11 +583,15 @@ void solveStandardQuery(QueryState& query){
 			
 				exit(0);
 			}
-			 
+			
+			servIndex++;	 
+		}
+		else{
+		
+			return;
+		
 		}
 		
-		servIndex++;
-
 	}
 
 	

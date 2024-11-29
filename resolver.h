@@ -133,9 +133,16 @@ class QueryState{
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState& q);
 		
-		void expandAnswers(shared_ptr<ResourceRecord> r);
-		void expandNextServerAnswer(shared_ptr<ResourceRecord> r);
-		void expandNextServers(shared_ptr<ResourceRecord> r);
+		void expandAnswers(std::string answer);
+		void expandNextServerAnswer(std::string server, std::string answer);
+		void expandNextServers(std::string server);
+		
+		void expandAnswers(std::shared_ptr<ResourceRecord> r);
+		void expandNextServerAnswer(std::shared_ptr<ResourceRecord> r);
+		void expandNextServers(std::shared_ptr<ResourceRecord> r);
+		
+		bool haveLocalOpsLeft();
+		bool haveGlobalOpsLeft();
 		
 	private:
 		void extractDataFromResponse(DNSMessage& msg);
