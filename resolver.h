@@ -10,6 +10,7 @@
 #include <mutex>
 #include <thread>
 
+#define maxDomainNameLen 255
 
 //operation capping to make sure threads dont go out of control or network errors cause program to run forever.
 //a thread spawn or network request is one operation decrement
@@ -151,7 +152,7 @@ class QueryState{
 
 void loadSafeties(std::string filePath);
 void solveStandardQuery(QueryState& query);
-
+void dumpCacheToFile();
 
 
 

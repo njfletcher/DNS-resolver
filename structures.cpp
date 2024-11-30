@@ -8,6 +8,7 @@
 #include <ctime>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sstream>
 
 using namespace std;
 
@@ -64,20 +65,30 @@ void DNSFlags::toBuffer(vector<uint8_t> & buffer){
 	
 }
 
-void DNSFlags::print(){
+void DNSFlags::buildString(stringstream& s){
 
-	cout << "========================START DNS HEADER FLAGS==========================" << endl;
-	cout << "qr(query or response): " << (+_qr) << endl; 
-	cout << "opcode(type of query): " << (+_opcode) << endl; 
-	cout << "aa(is this an authoritative answer?): " << (+_aa) << endl; 
-	cout << "tc(was this message truncated?): " << (+_tc) << endl; 
-	cout << "rd(should the name server recursively respond to the query?): " << (+_rd) << endl; 
-	cout << "ra(can the name server support recursive query requests?): " << (+_ra) << endl; 
-	cout << "z(reserved, must be 0): " << (+_z) << endl; 
-	cout << "rcode(response code): " << (+_rcode) << endl; 
-	cout << "========================END DNS HEADER FLAGS============================" << endl;
+	s << "========================START DNS HEADER FLAGS==========================" << endl;
+	s << dec;
+	s << "qr(query or response): " <<  _qr << endl; 
+	s << "opcode(type of query): " << _opcode << endl; 
+	s << "aa(is this an authoritative answer?): " <<  _aa << endl; 
+	s << "tc(was this message truncated?): " << _tc << endl; 
+	s << "rd(should the name server recursively respond to the query?): " << _rd << endl; 
+	s << "ra(can the name server support recursive query requests?): " << _ra << endl; 
+	s << "z(reserved, must be 0): " << _z << endl; 
+	s << "rcode(response code): " << _rcode << endl; 
+	s << "========================END DNS HEADER FLAGS============================" << endl;
 
 }
+
+void DNSFlags::print(){
+
+	stringstream s;
+	buildString(s);
+	cout << s.str() << endl;
+
+}
+
 
 DNSHeader::DNSHeader(){};
 
@@ -139,18 +150,28 @@ void DNSHeader::toBuffer(vector<uint8_t> & buffer){
 	
 }
 
-void DNSHeader::print(){
+void DNSHeader::buildString(std::stringstream& s){
 
-	cout << "++++++++++++++++++++++START DNS HEADER+++++++++++++++++++++++++++" << endl;
-	cout << "transId(id of query/response): " << _transId << endl; 
-	_flags.print();
-	cout << "numQuestions(number of question records in body of message): " << _numQuestions << endl; 
-	cout << "numAnswers(number of answer records in body of message): " << _numAnswers << endl; 
-	cout << "numAuthRR(number of authoritative resource records in body of message): " << _numAuthRR << endl; 
-	cout << "numAdditRR(number of additional(non answer) records in body of message): " << _numAdditRR << endl; 
-	cout << "+++++++++++++++++++++END DNS HEADER++++++++++++++++++++++++++++++" << endl;
+	s << "++++++++++++++++++++++START DNS HEADER+++++++++++++++++++++++++++" << endl;
+	s << dec;
+	s << "transId(id of query/response): " << _transId << endl; 
+	_flags.buildString(s);
+	s << "numQuestions(number of question records in body of message): " << _numQuestions << endl; 
+	s << "numAnswers(number of answer records in body of message): " << _numAnswers << endl; 
+	s << "numAuthRR(number of authoritative resource records in body of message): " << _numAuthRR << endl; 
+	s << "numAdditRR(number of additional(non answer) records in body of message): " << _numAdditRR << endl; 
+	s << "+++++++++++++++++++++END DNS HEADER++++++++++++++++++++++++++++++" << endl;
 
 }
+
+void DNSHeader::print(){
+
+	stringstream s;
+	buildString(s);
+	cout << s.str() << endl;
+}
+
+
 
 /*
 convertCStringToOctetForm-
@@ -302,10 +323,11 @@ takes a vector in octet form of a domain name that includes length bytes and com
 Prints special messages when a length or compression byte is encountered.
 */
 
-void printOctetSeq(const vector<uint8_t> & nameSequence){
+string getOctetSeqString(const vector<uint8_t> & nameSequence){
 
 	uint8_t currLength = 0;
 	uint8_t currCounter = 0;
+	string s;
 	for(auto iter = nameSequence.begin(); iter != nameSequence.end(); iter++){
 	
 		//this byte should be a length byte
@@ -320,10 +342,10 @@ void printOctetSeq(const vector<uint8_t> & nameSequence){
 				offset = offset + 2;
 				currLength = 0;
 				currCounter =0;
-				cout << "compressed w/ offset: " << offset << " ";
+				s = s + "compressed w/ offset: " + to_string(offset) + " ";
 			}
 			else{
-				cout << " len: " << (+currLength) << " label: ";
+				s = s + " len: " + to_string(currLength) + " label: ";
 				currCounter = 0;
 				//0 length terminator
 				if(currLength == 0) break;
@@ -332,11 +354,13 @@ void printOctetSeq(const vector<uint8_t> & nameSequence){
 		//still reading a label
 		else{
 			currCounter = currCounter + 1;
-			cout << " " << (*iter) << " ";
+			s = s + " " +  to_string(*iter) + " ";
 
 		}
 	
 	}
+	
+	return s;
 
 
 }
@@ -476,20 +500,28 @@ void QuestionRecord::toBuffer(vector<uint8_t> & buffer){
 		
 }
 
-void QuestionRecord::print(uint16_t number = 0){
+void QuestionRecord::buildString(std::stringstream& s, uint16_t number){
 
-	cout << "------------------------START QUESTIONRECORD " << number << " ---------------------------------" << endl;
-	cout << "name: [";
-	printOctetSeq(_name); 
-	cout << "]" << endl;
-	
-	cout << "qType(type of the question record): " << (+_qType) << endl; 
-	cout << "qClass(class of the question record): " << (+_qClass) << endl; 
-	cout << "------------------------END QUESTIONRECORD " << number << " ----------------------------------------" << endl;
-
-
+	s << dec;
+	s << "------------------------START QUESTIONRECORD " << number << " ---------------------------------" << endl;
+	s << "name: [";
+	s << getOctetSeqString(_name); 
+	s << "]" << endl;
+	s << "realName: " << _realName << endl; 
+	s << "qType(type of the question record): " << _qType << endl; 
+	s << "qClass(class of the question record): " << _qClass << endl; 
+	s << "------------------------END QUESTIONRECORD " << number << " ----------------------------------------" << endl;
 
 }
+
+void QuestionRecord::print(uint16_t number){
+
+	stringstream s;
+	buildString(s, number);
+	cout << s.str() << endl;
+
+}
+
 
 ResourceRecord::ResourceRecord(){};
 
@@ -574,26 +606,37 @@ void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 		
 }
 
-void ResourceRecord::print(uint16_t number = 0){
+void ResourceRecord::buildString(std::stringstream& s, uint16_t number){
 
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START RESOURCERECORD " << number << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-	cout << "name: [";
-	printOctetSeq(_name); 
-	cout << "]" << endl;
+	s << dec;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^START RESOURCERECORD " << number << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "name: [";
+	s << getOctetSeqString(_name); 
+	s << "]" << endl;
+	s << "realName: " << _realName << endl;
 	
-	cout << "rType(type of the resource record): " << _rType << endl; 
-	cout << "rClass(class of the resource record): " << _rClass << endl; 
-	cout << "ttl(time to live): " << _ttl << endl; 
-	cout << "rdLength(length in octets of rdata section): " << _rdLength << endl; 
-	cout << "rData(resource data): [";
+	s << "rType(type of the resource record): " << _rType << endl; 
+	s << "rClass(class of the resource record): " << _rClass << endl; 
+	s << "ttl(time to live): " << _ttl << endl; 
+	s << "rdLength(length in octets of rdata section): " << _rdLength << endl; 
+	s << "rData(resource data): [";
 	for(auto iter = _rData.begin(); iter != _rData.end(); iter++){
-		cout << " " << +(*iter);
+		s << " " << *iter;
 	}
-	cout << "]" << endl;
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^END RESOURCERECORD " << number << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-
+	s << "]" << endl;
+	s << "converted data: " << getDataAsString();
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^END RESOURCERECORD " << number << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
 }
+
+void ResourceRecord::print(uint16_t number){
+
+	stringstream s;
+	buildString(s, number);
+	cout << s.str() << endl;
+
+}
+
 
 void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
 	vector<uint8_t> realDomain;
@@ -762,44 +805,55 @@ void DNSMessage::toBuffer(vector<uint8_t> & buffer){
 		
 }
 
-void DNSMessage::print(){
+void DNSMessage::buildString(std::stringstream& s){
 
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START DNSMESSAGE^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-	_hdr.print();
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^START DNSMESSAGE^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	_hdr.buildString(s);
 	
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START QUESTIONS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^START QUESTIONS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	for(uint16_t i = 0; i < _hdr._numQuestions; i++){
 	
-		_question[i].print(i);
+		_question[i].buildString(s,i);
 	}
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END QUESTIONS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^END QUESTIONS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START ANSWERS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^START ANSWERS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
 	for(uint16_t i = 0; i < _hdr._numAnswers; i++){
 	
-		_answer[i]->print(i);
+		_answer[i]->buildString(s,i);
 	}
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END ANSWERS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^END ANSWERS^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START AUTHORITY^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^START AUTHORITY^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	for(uint16_t i = 0; i < _hdr._numAuthRR; i++){
 	
-		_authority[i]->print(i);
+		_authority[i]->buildString(s,i);
 	}
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END AUTHORITY^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^END AUTHORITY^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^START ADDITIONAL^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^START ADDITIONAL^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 	
 	for(uint16_t i = 0; i < _hdr._numAdditRR; i++){
 	
-		_additional[i]->print(i);
+		_additional[i]->buildString(s,i);
 	}
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END ADDITIONAL^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-	cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^END DNSMESSAGE^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^END ADDITIONAL^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+	s << "^^^^^^^^^^^^^^^^^^^^^^^^^^END DNSMESSAGE^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
 }
+
+void DNSMessage::print(){
+
+	stringstream s;
+	buildString(s);
+	cout << s.str() << endl;
+	
+}
+
+
+
+
 
 
 

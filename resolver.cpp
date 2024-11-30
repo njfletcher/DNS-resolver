@@ -13,16 +13,40 @@
 #include <unistd.h> 
 #include <mutex>
 #include <thread>
+#include <sstream>
 
 using namespace std;
 
 vector<pair<string,string>> safety;
 
-std::mutex idMutex;
+mutex idMutex;
 vector<uint16_t> takenIds;
 
-std::mutex cacheMutex;
-unordered_map<string, vector< std::shared_ptr<ResourceRecord> > > cache;
+mutex cacheMutex;
+unordered_map<string, vector< shared_ptr<ResourceRecord> > > cache;
+
+
+void dumpCacheToFile(){
+
+	ofstream ot("cacheDump.txt");
+	
+	for(auto iter = cache.begin(); iter != cache.end(); iter++){
+		
+		vector<shared_ptr<ResourceRecord> >& lr = iter->second;
+		
+		for(auto iterR = lr.begin(); iterR < lr.end(); iterR++){
+			stringstream s;
+			shared_ptr<ResourceRecord>& r = *iterR;
+			r->buildString(s);
+			string str = s.str();
+			ot << str << endl;
+		}
+	
+	
+	}
+	
+	
+}
 
 
 uint16_t pickNextId(){
@@ -174,6 +198,8 @@ vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 //assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
 void QueryState::cacheRecords(DNSMessage& msg){
 
+	cout << "caching records " << endl;
+
 	for(auto iter = msg._answer.begin(); iter < msg._answer.end(); iter++){
 	
 		shared_ptr<ResourceRecord>& r = *iter;
@@ -315,6 +341,7 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 		}
 		
 		if(_answers.size() > 0){
+			_numOpsLocalLeft=0;
 			return;
 		}
 	
@@ -382,7 +409,7 @@ void sendStandardQuery(string nameServerIp, QueryState& state){
 
 	decrementOps(state);
 	if(!state.haveLocalOpsLeft() || !state.haveGlobalOpsLeft()) return;
-	
+		
 	
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
 	DNSHeader hdr(state._id, flg, 1, 0, 0,0);
@@ -439,8 +466,10 @@ void splitDomainName(string domainName, vector<string>& splits){
 
 void solveStandardQuery(QueryState& query){
 
+	cout << "SOLVING QUERY " << query._sname << endl;
 	query._readyForUse = false;
 
+	cout << "checking direct cache " << query._sname << endl;
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex.lock();
 	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query._sname);
@@ -480,6 +509,7 @@ void solveStandardQuery(QueryState& query){
 		
 		}
 		
+		cout << "checking indirect cache " << query._sname << endl;
 		cacheMutex.lock();
 		vector<shared_ptr<ResourceRecord> >* indirectCached = getRecordsFromCache(currDomain);
 		if(indirectCached != NULL){
@@ -493,6 +523,7 @@ void solveStandardQuery(QueryState& query){
 	
 	}
 	
+	cout << "adding safeties" << query._sname << endl;
 	//add safety belt servers on at the end, these are assumed to be correct so no further investigation needed.
 	for(auto safetyIter = safety.begin(); safetyIter < safety.end(); safetyIter++){
 	
@@ -505,6 +536,7 @@ void solveStandardQuery(QueryState& query){
 	//one thread devoted to each nameserver for resolving the current query.
 	//if a nameserver does not yet have an address, use the nameserver's thread to resolve its address.
 	//if a nameserver has multiple ips on record, they are all investigated on the same thread for simplicity.
+	cout << "asking nameservers " << query._sname << endl;
 	vector<QueryState>& nsServers = query._nextServers;
 	size_t servIndex = 0;
 	
@@ -512,6 +544,7 @@ void solveStandardQuery(QueryState& query){
 	
 		query._servMutex->lock();
 		size_t servSize = nsServers.size();
+		cout << servSize << endl;
 		if(servIndex >= servSize){
 			servIndex = 0;
 			query._servMutex->unlock();
@@ -520,8 +553,11 @@ void solveStandardQuery(QueryState& query){
 		QueryState& currS = nsServers[servIndex];
 		query._servMutex->unlock();
 		
+		cout << "here " <<endl;
 		decrementOps(query);
 		if(query.haveLocalOpsLeft() && query.haveGlobalOpsLeft()){
+		
+			cout << query._sname << " has ops left" << endl;
 		
 			pid_t pid = fork();		 
 			if(pid < 0){
@@ -530,6 +566,8 @@ void solveStandardQuery(QueryState& query){
 			else if (pid == 0){
 		
 				if(currS._readyForUse){
+				
+					cout << query._sname << " ns " << currS._sname << " ready for use" << endl;
 			
 					if(currS._answers.size() < 1){
 						solveStandardQuery(currS);
@@ -549,6 +587,7 @@ void solveStandardQuery(QueryState& query){
 							string ans = nsAns[ansIndex];
 							currS._ansMutex->unlock();
 							
+							cout << "Answering " << query._sname << " with " << ans << " " << currS._sname << endl;
 							sendStandardQuery(ans, query);
 							ansIndex++;
 							

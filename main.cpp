@@ -19,26 +19,14 @@ int main(int argc, char** argv){
 	
 	}
 	
-	/*vector<pair<string,string> > servers;
-	readSafetyFile(argv[2], servers);
+	
+	loadSafeties(argv[2]);
 
-	verifyRootNameServers(servers);
-	
-	string startIp = "";
-	for(auto iter = servers.begin(); iter < servers.end(); iter++){
-		pair<string,string> p = *iter;
-		if(p.first != ""){
-			startIp = p.first;
-			break;
-		}
-	
-	}
-	
-	*/
 	
 	QueryState q = QueryState(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
 	solveStandardQuery(q);
 	
+	dumpCacheToFile();
 	
 	return 0;
 
