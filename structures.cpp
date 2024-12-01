@@ -69,14 +69,14 @@ void DNSFlags::buildString(stringstream& s){
 
 	s << "========================START DNS HEADER FLAGS==========================" << endl;
 	s << dec;
-	s << "qr(query or response): " <<  _qr << endl; 
-	s << "opcode(type of query): " << _opcode << endl; 
-	s << "aa(is this an authoritative answer?): " <<  _aa << endl; 
-	s << "tc(was this message truncated?): " << _tc << endl; 
-	s << "rd(should the name server recursively respond to the query?): " << _rd << endl; 
-	s << "ra(can the name server support recursive query requests?): " << _ra << endl; 
-	s << "z(reserved, must be 0): " << _z << endl; 
-	s << "rcode(response code): " << _rcode << endl; 
+	s << "qr(query or response): " <<  +_qr << endl; 
+	s << "opcode(type of query): " << +_opcode << endl; 
+	s << "aa(is this an authoritative answer?): " <<  +_aa << endl; 
+	s << "tc(was this message truncated?): " << +_tc << endl; 
+	s << "rd(should the name server recursively respond to the query?): " << +_rd << endl; 
+	s << "ra(can the name server support recursive query requests?): " << +_ra << endl; 
+	s << "z(reserved, must be 0): " << +_z << endl; 
+	s << "rcode(response code): " << +_rcode << endl; 
 	s << "========================END DNS HEADER FLAGS============================" << endl;
 
 }
@@ -624,7 +624,7 @@ void ResourceRecord::buildString(std::stringstream& s, uint16_t number){
 		s << " " << *iter;
 	}
 	s << "]" << endl;
-	s << "converted data: " << getDataAsString();
+	s << "converted data: " << getDataAsString() << endl;
 	s << "^^^^^^^^^^^^^^^^^^^^^^^^^END RESOURCERECORD " << number << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
 }
@@ -644,8 +644,7 @@ void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<u
 	_domain = convertOctetSeqToString(realDomain);
 }
 
-NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
-	ResourceRecord(start, iter, end, succeeded);
+NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
 	convertRData(start, end);
 }
 
@@ -685,8 +684,7 @@ void AResourceRecord::convertRData(){
 
 }
 
-AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
-	ResourceRecord(start, iter, end, succeeded);
+AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end,succeeded) {
 	convertRData();
 }
 

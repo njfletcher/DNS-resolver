@@ -57,6 +57,7 @@ uint16_t pickNextId(){
 		if(*iter > max) max = *iter;
 	
 	}
+	takenIds.push_back(max + 1);
 	idMutex.unlock();
 	return max + 1;
 
@@ -324,9 +325,12 @@ void QueryState::expandNextServerAnswer(string domainName, string answer){
 
 void QueryState::extractDataFromResponse(DNSMessage& msg){
 
+	//msg.print();
+
 
 	if(checkForResponseErrors(msg)) return;
 	else cacheRecords(msg);
+	cout << "CACHE SIZE " << msg._hdr._transId << " " << cache.size() << endl; 
 	
 	
 	uint16_t numAnswersClaim = msg._hdr._numAnswers;
@@ -587,7 +591,7 @@ void solveStandardQuery(QueryState& query){
 							string ans = nsAns[ansIndex];
 							currS._ansMutex->unlock();
 							
-							cout << "Answering " << query._sname << " with " << ans << " " << currS._sname << endl;
+							cout << "Answering " << query._sname << " with " << ans << " " << currS._sname << " id " << currS._id << endl;
 							sendStandardQuery(ans, query);
 							ansIndex++;
 							
