@@ -92,8 +92,8 @@ class ResourceRecord{
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 				
 		virtual std::string getDataAsString();
-		void affectAnswers(QueryState& q);
-		void affectNameServers(QueryState& q);
+		virtual void affectAnswers(QueryState* q);
+		virtual void affectNameServers(QueryState* q);
 		
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s, uint16_t number = 0);
@@ -106,8 +106,8 @@ class NSResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
 		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-		void affectAnswers(QueryState& q);
-		void affectNameServers(QueryState& q);
+		void affectAnswers(QueryState* q);
+		void affectNameServers(QueryState* q);
 		
 	private:
 		std::string _domain;
@@ -118,8 +118,8 @@ class AResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData();
 		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-		void affectAnswers(QueryState& q);
-		void affectNameServers(QueryState& q);
+		void affectAnswers(QueryState* q);
+		void affectNameServers(QueryState* q);
 		
 	private:
 		uint32_t _ip;

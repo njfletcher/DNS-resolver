@@ -140,7 +140,7 @@ void loadSafeties(string filePath){
 		delimPos = currLine.find(";");
 		
 		if(delimPos == string::npos){
-			cout << "Invalid safety belt file format: line is missing semi colon" << endl;
+			//cout << "Invalid safety belt file format: line is missing semi colon" << endl;
 		
 		}
 		else{
@@ -199,7 +199,7 @@ vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 //assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
 void QueryState::cacheRecords(DNSMessage& msg){
 
-	cout << "caching records " << endl;
+	//cout << "caching records " << endl;
 
 	for(auto iter = msg._answer.begin(); iter < msg._answer.end(); iter++){
 	
@@ -299,7 +299,14 @@ void QueryState::expandNextServers(string domainName){
 					
 		}
 	}			
-	if(isUniqueName) _nextServers.emplace_back(domainName, _stype, _sclass, *this);
+	if(isUniqueName){
+		cout << domainName << " unique " << endl;
+		 _nextServers.emplace_back(domainName, _stype, _sclass, *this);
+	}
+	else{
+		cout << domainName << " not unique " <<endl;
+	
+	}
 	_servMutex->unlock();
 
 }
@@ -339,8 +346,7 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 	if(numAnswersClaim > 0){
 		
 		for(size_t i =0; i < numAnswersActual; i++){
-			shared_ptr<ResourceRecord> r = msg._answer[i];
-			r->affectAnswers(*this);
+			msg._answer[i]->affectAnswers(this);
 		
 		}
 		
@@ -355,8 +361,7 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 	size_t numAuthActual = msg._authority.size();
 	if(numAuthClaim > 0){
 		for(size_t i =0; i < numAuthActual; i++){
-			shared_ptr<ResourceRecord> r = msg._authority[i];
-			r->affectNameServers(*this);
+			msg._authority[i]->affectNameServers(this);
 		}
 	
 	}
@@ -366,8 +371,7 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 	if(numAdditClaim > 0){
 		
 		for(size_t i =0; i < numAdditActual; i++){
-			shared_ptr<ResourceRecord> r = msg._additional[i];
-			r->affectNameServers(*this);
+			msg._additional[i]->affectNameServers(this);
 		
 		}
 		
@@ -470,10 +474,10 @@ void splitDomainName(string domainName, vector<string>& splits){
 
 void solveStandardQuery(QueryState& query){
 
-	cout << "SOLVING QUERY " << query._sname << endl;
+	//cout << "SOLVING QUERY " << query._sname << endl;
 	query._readyForUse = false;
 
-	cout << "checking direct cache " << query._sname << endl;
+	//cout << "checking direct cache " << query._sname << endl;
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex.lock();
 	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query._sname);
@@ -481,7 +485,7 @@ void solveStandardQuery(QueryState& query){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
 			shared_ptr<ResourceRecord> r = *iter;
-			r->affectAnswers(query);
+			r->affectAnswers(&query);
 		
 		}
 	}
@@ -513,21 +517,21 @@ void solveStandardQuery(QueryState& query){
 		
 		}
 		
-		cout << "checking indirect cache " << query._sname << endl;
+		//cout << "checking indirect cache " << query._sname << endl;
 		cacheMutex.lock();
 		vector<shared_ptr<ResourceRecord> >* indirectCached = getRecordsFromCache(currDomain);
 		if(indirectCached != NULL){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
 				shared_ptr<ResourceRecord> r = *iter;
-				r->affectNameServers(query);
+				r->affectNameServers(&query);
 			}
 		}
 		cacheMutex.unlock();
 	
 	}
 	
-	cout << "adding safeties" << query._sname << endl;
+	//cout << "adding safeties" << query._sname << endl;
 	//add safety belt servers on at the end, these are assumed to be correct so no further investigation needed.
 	for(auto safetyIter = safety.begin(); safetyIter < safety.end(); safetyIter++){
 	
@@ -540,7 +544,7 @@ void solveStandardQuery(QueryState& query){
 	//one thread devoted to each nameserver for resolving the current query.
 	//if a nameserver does not yet have an address, use the nameserver's thread to resolve its address.
 	//if a nameserver has multiple ips on record, they are all investigated on the same thread for simplicity.
-	cout << "asking nameservers " << query._sname << endl;
+	//cout << "asking nameservers " << query._sname << endl;
 	vector<QueryState>& nsServers = query._nextServers;
 	size_t servIndex = 0;
 	
@@ -557,11 +561,11 @@ void solveStandardQuery(QueryState& query){
 		QueryState& currS = nsServers[servIndex];
 		query._servMutex->unlock();
 		
-		cout << "here " <<endl;
+		//cout << "here " <<endl;
 		decrementOps(query);
 		if(query.haveLocalOpsLeft() && query.haveGlobalOpsLeft()){
 		
-			cout << query._sname << " has ops left" << endl;
+			//cout << query._sname << " has ops left" << endl;
 		
 			pid_t pid = fork();		 
 			if(pid < 0){
@@ -591,7 +595,7 @@ void solveStandardQuery(QueryState& query){
 							string ans = nsAns[ansIndex];
 							currS._ansMutex->unlock();
 							
-							cout << "Answering " << query._sname << " with " << ans << " " << currS._sname << " id " << currS._id << endl;
+							//cout << "Answering " << query._sname << " with " << ans << " " << currS._sname << " id " << currS._id << endl;
 							sendStandardQuery(ans, query);
 							ansIndex++;
 							
