@@ -379,21 +379,21 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 	
 } 
 
-void decrementOps(QueryState& q){
+void decrementOps(QueryState* q){
 
-	unsigned int& opsL = q._numOpsLocalLeft;
+	unsigned int& opsL = q->_numOpsLocalLeft;
 	if(opsL > 0){
 		opsL = opsL - 1;
 	}
 
-	q._opMutex->lock();
+	q->_opMutex->lock();
 	
-	unsigned int& opsG = *(q._numOpsGlobalLeft);
+	unsigned int& opsG = *(q->_numOpsGlobalLeft);
 	if(opsG > 0){
 		opsG = opsG - 1;
 	}
 	
-	q._opMutex->unlock();
+	q->_opMutex->unlock();
 
 }
 
@@ -413,15 +413,15 @@ bool QueryState::haveGlobalOpsLeft(){
 }
 
 
-void sendStandardQuery(string nameServerIp, QueryState& state){
+void sendStandardQuery(string nameServerIp, QueryState* state){
 
 	decrementOps(state);
-	if(!state.haveLocalOpsLeft() || !state.haveGlobalOpsLeft()) return;
+	if(!state->haveLocalOpsLeft() || !state->haveGlobalOpsLeft()) return;
 		
 	
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
-	DNSHeader hdr(state._id, flg, 1, 0, 0,0);
-	QuestionRecord q(state._sname.c_str(), state._stype , state._sclass );
+	DNSHeader hdr(state->_id, flg, 1, 0, 0,0);
+	QuestionRecord q(state->_sname.c_str(), state->_stype , state->_sclass );
 	
 	vector<QuestionRecord> qr = {q};
 	vector<shared_ptr<ResourceRecord>> rr;
@@ -433,14 +433,14 @@ void sendStandardQuery(string nameServerIp, QueryState& state){
 
 	int networkResult = sendMessageResolverClient(nameServerIp, buff, resp);
 	
-	state._networkCode = networkResult;
+	state->_networkCode = networkResult;
 	
 	if(networkResult == (int) NetworkErrors::none){
 		auto iter = resp.begin();
 		DNSMessage msg = DNSMessage(iter, iter, resp.end());
-		state._msgCode = msg._hdr._flags._rcode;
+		state->_msgCode = msg._hdr._flags._rcode;
 		
-		state.extractDataFromResponse(msg);
+		state->extractDataFromResponse(msg);
 	
 	}
 	
@@ -472,36 +472,36 @@ void splitDomainName(string domainName, vector<string>& splits){
 
 }
 
-void solveStandardQuery(QueryState& query){
+void solveStandardQuery(QueryState* query){
 
 	//cout << "SOLVING QUERY " << query._sname << endl;
-	query._readyForUse = false;
+	query->_readyForUse = false;
 
 	//cout << "checking direct cache " << query._sname << endl;
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex.lock();
-	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query._sname);
+	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query->_sname);
 	if(directCached != NULL){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
 			shared_ptr<ResourceRecord> r = *iter;
-			r->affectAnswers(&query);
+			r->affectAnswers(query);
 		
 		}
 	}
 	cacheMutex.unlock();
 	
-	query._ansMutex->lock();
-	size_t ansSize = query._answers.size();
-	query._ansMutex->unlock();
+	query->_ansMutex->lock();
+	size_t ansSize = query->_answers.size();
+	query->_ansMutex->unlock();
 	
 	if(ansSize > 0){
-		query._readyForUse = true; 
+		query->_readyForUse = true; 
 		return; 
 	}
 	
 	vector<string> splits;
-	splitDomainName(query._sname, splits);
+	splitDomainName(query->_sname, splits);
 	//walking the current domain and ancestor domains to look for nameserver domain names we might want to consult, since we dont have an answer yet.
 	for(size_t i = 0; i < splits.size(); i++){
 		
@@ -524,7 +524,7 @@ void solveStandardQuery(QueryState& query){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
 				shared_ptr<ResourceRecord> r = *iter;
-				r->affectNameServers(&query);
+				r->affectNameServers(query);
 			}
 		}
 		cacheMutex.unlock();
@@ -536,8 +536,8 @@ void solveStandardQuery(QueryState& query){
 	for(auto safetyIter = safety.begin(); safetyIter < safety.end(); safetyIter++){
 	
 		pair<string, string> safeNs = *safetyIter;
-		query.expandNextServers(safeNs.second);
-		query.expandNextServerAnswer(safeNs.second, safeNs.first);
+		query->expandNextServers(safeNs.second);
+		query->expandNextServerAnswer(safeNs.second, safeNs.first);
 	
 	}
 		
@@ -545,25 +545,25 @@ void solveStandardQuery(QueryState& query){
 	//if a nameserver does not yet have an address, use the nameserver's thread to resolve its address.
 	//if a nameserver has multiple ips on record, they are all investigated on the same thread for simplicity.
 	//cout << "asking nameservers " << query._sname << endl;
-	vector<QueryState>& nsServers = query._nextServers;
 	size_t servIndex = 0;
 	
 	while(true){
 	
-		query._servMutex->lock();
+		vector<QueryState>& nsServers = query->_nextServers;
+		query->_servMutex->lock();
 		size_t servSize = nsServers.size();
 		cout << servSize << endl;
 		if(servIndex >= servSize){
 			servIndex = 0;
-			query._servMutex->unlock();
+			query->_servMutex->unlock();
 			continue;
 		}
 		QueryState& currS = nsServers[servIndex];
-		query._servMutex->unlock();
+		query->_servMutex->unlock();
 		
 		//cout << "here " <<endl;
 		decrementOps(query);
-		if(query.haveLocalOpsLeft() && query.haveGlobalOpsLeft()){
+		if(query->haveLocalOpsLeft() && query->haveGlobalOpsLeft()){
 		
 			//cout << query._sname << " has ops left" << endl;
 		
@@ -575,10 +575,10 @@ void solveStandardQuery(QueryState& query){
 		
 				if(currS._readyForUse){
 				
-					cout << query._sname << " ns " << currS._sname << " ready for use" << endl;
+					cout << query->_sname << " ns " << currS._sname << " ready for use" << endl;
 			
 					if(currS._answers.size() < 1){
-						solveStandardQuery(currS);
+						solveStandardQuery(&currS);
 					}
 					else{
 					

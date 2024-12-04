@@ -151,7 +151,7 @@ class QueryState{
 };
 
 void loadSafeties(std::string filePath);
-void solveStandardQuery(QueryState& query);
+void solveStandardQuery(QueryState* query);
 void dumpCacheToFile();
 
 

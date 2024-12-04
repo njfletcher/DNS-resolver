@@ -23,11 +23,11 @@ int main(int argc, char** argv){
 	loadSafeties(argv[2]);
 
 	
-	QueryState q = QueryState(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
+	QueryState* q = new QueryState(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
 	solveStandardQuery(q);
 	
 	cout << "ANSWERS " << endl;
-	for(auto iter = q._answers.begin(); iter < q._answers.end(); iter++){
+	for(auto iter = q->_answers.begin(); iter < q->_answers.end(); iter++){
 	
 		cout << *iter << endl;
 	}
