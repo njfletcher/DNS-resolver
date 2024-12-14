@@ -280,7 +280,16 @@ bool QueryState::checkForFatalErrors(){
 void QueryState::expandAnswers(string answer){
 		
 	_ansMutex->lock();
-	_answers.push_back(answer);
+	bool unique = true;
+	for(auto iter = _answers.begin(); iter < _answers.end(); iter++){
+		if(*iter == answer){
+			unique = false;
+			break;
+		
+		}
+	
+	}
+	if(unique) _answers.push_back(answer);
 	_ansMutex->unlock();
 	
 
@@ -606,17 +615,17 @@ void solveStandardQuery(QueryState* query){
 				
 			});
 			
-			workThr.join();
-					 
+			workThr.detach();	 
 			servIndex++;	 
 		}
 		else{
 		
-			return;
+			break;
 		
 		}
 		
 	}
+	
 
 	
 }
