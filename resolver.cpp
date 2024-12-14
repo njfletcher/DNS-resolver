@@ -25,6 +25,8 @@ vector<uint16_t> takenIds;
 mutex cacheMutex;
 unordered_map<string, vector< shared_ptr<ResourceRecord> > > cache;
 
+thread::id mainThread = this_thread::get_id();
+
 
 void dumpCacheToFile(){
 
@@ -199,7 +201,7 @@ vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 //assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
 void QueryState::cacheRecords(DNSMessage& msg){
 
-	//cout << "caching records " << endl;
+	cout << "caching records " << endl;
 
 	for(auto iter = msg._answer.begin(); iter < msg._answer.end(); iter++){
 	
@@ -567,12 +569,9 @@ void solveStandardQuery(QueryState* query){
 		
 			//cout << query._sname << " has ops left" << endl;
 		
-			pid_t pid = fork();		 
-			if(pid < 0){
-				exit(EXIT_FAILURE);
-			}
-			else if (pid == 0){
-		
+			thread workThr( [&](){
+			
+			
 				if(currS._readyForUse){
 				
 					cout << query->_sname << " ns " << currS._sname << " ready for use" << endl;
@@ -604,10 +603,11 @@ void solveStandardQuery(QueryState* query){
 					}
 			
 				}
+				
+			});
 			
-				exit(0);
-			}
-			
+			workThr.join();
+					 
 			servIndex++;	 
 		}
 		else{
