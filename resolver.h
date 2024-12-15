@@ -15,7 +15,7 @@
 //operation capping to make sure threads dont go out of control or network errors cause program to run forever.
 //a thread spawn or network request is one operation decrement
 #define perQueryOpCap 10
-#define perSequenceOpCap 1000
+#define perSequenceOpCap 50
 
 class DNSMessage;
 
@@ -106,6 +106,8 @@ class QueryState{
 		//qclass of request
 		uint16_t _sclass;
 		
+		int _matchScore;
+		
 		//name servers this request thinks will be helpful
 		std::vector<QueryState> _nextServers;
 		
@@ -142,6 +144,8 @@ class QueryState{
 		bool haveLocalOpsLeft();
 		bool haveGlobalOpsLeft();
 		void extractDataFromResponse(DNSMessage& msg);
+		
+		void setMatchScore(std::string domainName);
 		
 	private:
 		bool checkForFatalErrors();

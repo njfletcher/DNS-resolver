@@ -14,6 +14,7 @@
 #include <mutex>
 #include <thread>
 #include <sstream>
+#include <algorithm> 
 
 using namespace std;
 
@@ -24,8 +25,6 @@ vector<uint16_t> takenIds;
 
 mutex cacheMutex;
 unordered_map<string, vector< shared_ptr<ResourceRecord> > > cache;
-
-thread::id mainThread = this_thread::get_id();
 
 
 void dumpCacheToFile(){
@@ -125,6 +124,9 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState
 	_startTime = time(NULL);
 	_id = pickNextId();
 }
+
+
+
 
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
@@ -312,7 +314,8 @@ void QueryState::expandNextServers(string domainName){
 	}			
 	if(isUniqueName){
 		cout << domainName << " unique " << endl;
-		 _nextServers.emplace_back(domainName, _stype, _sclass, *this);
+		_nextServers.emplace_back(domainName, _stype, _sclass, *this);
+		_nextServers[_nextServers.size()-1].setMatchScore(_sname);
 	}
 	else{
 		cout << domainName << " not unique " <<endl;
@@ -483,6 +486,37 @@ void splitDomainName(string domainName, vector<string>& splits){
 
 }
 
+void QueryState::setMatchScore(string domainName){
+
+	vector<string> refSplits;
+	splitDomainName(domainName, refSplits);
+	
+	vector<string> ownSplits;
+	splitDomainName(_sname, ownSplits);
+	
+	int score = 0;
+	
+	size_t refLen = refSplits.size();
+	size_t ownLen = ownSplits.size();
+	
+	for(size_t i = refLen -1, j = ownLen -1; i >= 0 && j >=0; i--, j--){
+
+		if(refSplits[i] == ownSplits[j]){
+			score++;
+		}
+		else{
+			break;
+		}
+	
+	
+	} 
+
+	cout << "MATCHING " << _sname << " WITH " << domainName << " SCORE " << score << endl;
+	_matchScore = score;
+
+
+}
+
 void solveStandardQuery(QueryState* query){
 
 	//cout << "SOLVING QUERY " << query._sname << endl;
@@ -562,13 +596,14 @@ void solveStandardQuery(QueryState* query){
 	
 		vector<QueryState>& nsServers = query->_nextServers;
 		query->_servMutex->lock();
-		size_t servSize = nsServers.size();
-		cout << servSize << endl;
-		if(servIndex >= servSize){
-			servIndex = 0;
-			query->_servMutex->unlock();
-			continue;
-		}
+		size_t servSizeBefore = nsServers.size();
+		cout << servSizeBefore << endl;
+		sort(query->_nextServers.begin(), query->_nextServers.end(), [](QueryState& q1, QueryState& q2){ return q1._matchScore > q2._matchScore;} );
+		//if(servIndex >= servSizeBefore){
+		//	servIndex = 0;
+		//	query->_servMutex->unlock();
+		//	continue;
+		//}
 		QueryState& currS = nsServers[servIndex];
 		query->_servMutex->unlock();
 		
@@ -616,7 +651,9 @@ void solveStandardQuery(QueryState* query){
 			});
 			
 			workThr.detach();	 
-			servIndex++;	 
+			servIndex++;	
+			
+			
 		}
 		else{
 		

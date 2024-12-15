@@ -25,9 +25,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 	int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 	
-	int retries = 2;
-	setsockopt(clientSocket, IPPROTO_TCP, TCP_SYNCNT, &retries, sizeof(retries));
-	
+
 	if(clientSocket < 0){
 		perror("cant create socket\n");
 		return (int)NetworkErrors::socket;
