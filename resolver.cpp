@@ -26,7 +26,6 @@ vector<uint16_t> takenIds;
 mutex cacheMutex;
 unordered_map<string, vector< shared_ptr<ResourceRecord> > > cache;
 
-
 void dumpCacheToFile(){
 
 	ofstream ot("cacheDump.txt");
@@ -92,29 +91,32 @@ QueryState::~QueryState(){
 
 QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sname), _stype(stype), _sclass(sclass){ 
 
+
+	_readyForUse = true;
+	_id = pickNextId();
+	_matchScore = 0;
+	
+	_startTime = time(NULL);
+	
+	_networkCode = (int) NetworkErrors::none;
+	_msgCode = (uint8_t) ResponseCodes::none;
 	
 	_numOpsLocalLeft = perSequenceOpCap;
-	 _numOpsGlobalLeft = make_shared<unsigned int>(perSequenceOpCap);
+	_numOpsGlobalLeft = make_shared<unsigned int>(perSequenceOpCap);
 	
 	_opMutex = make_shared<std::mutex>();
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
 	
-	_readyForUse = true;
-	_networkCode = (int) NetworkErrors::none;
-	_msgCode = (uint8_t) ResponseCodes::none;
-	_startTime = time(NULL);
-	_id = pickNextId();
 }
 
 QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState& q): _sname(sname), _stype(stype), _sclass(sclass){ 
 
 	_numOpsLocalLeft = perQueryOpCap;
 	
-	//shared pointer reference counts are thread safe, so dont need to guard anything for copying
-	_opMutex = q._opMutex;
-	_ansMutex = q._ansMutex;
-	_servMutex = q._servMutex;
+	_opMutex = make_shared<std::mutex>();
+	_ansMutex = make_shared<std::mutex>();
+	_servMutex = make_shared<std::mutex>();
 	
 	 _numOpsGlobalLeft = q._numOpsGlobalLeft;
 	
@@ -346,12 +348,8 @@ void QueryState::expandNextServerAnswer(string domainName, string answer){
 
 void QueryState::extractDataFromResponse(DNSMessage& msg){
 
-	//msg.print();
-
-
 	if(checkForResponseErrors(msg)) return;
 	else cacheRecords(msg);
-	cout << "CACHE SIZE " << msg._hdr._transId << " " << cache.size() << endl; 
 	
 	
 	uint16_t numAnswersClaim = msg._hdr._numAnswers;
@@ -429,7 +427,6 @@ bool QueryState::haveGlobalOpsLeft(){
 
 void sendStandardQuery(string nameServerIp, QueryState* state){
 
-	decrementOps(state);
 	if(!state->haveLocalOpsLeft() || !state->haveGlobalOpsLeft()) return;
 		
 	
@@ -510,19 +507,48 @@ void QueryState::setMatchScore(string domainName){
 	
 	
 	} 
-
-	cout << "MATCHING " << _sname << " WITH " << domainName << " SCORE " << score << endl;
 	_matchScore = score;
 
 
 }
 
+
+void threadFunction(QueryState* currS,QueryState* query){
+
+	decrementOps(query);
+
+	if(currS->_readyForUse){
+	
+		vector<string> answers;
+		
+		currS->_ansMutex->lock();
+		for(auto iter = currS->_answers.begin(); iter < currS->_answers.end(); iter++){
+			answers.push_back(*iter);
+		}
+		currS->_ansMutex->unlock();
+		
+		if(answers.size() < 1){
+			solveStandardQuery(currS);
+		}
+		else{
+			for(auto iter = answers.begin(); iter < answers.end(); iter++){
+				string ans = *iter;
+				decrementOps(currS);
+				sendStandardQuery(ans, query);
+			
+			}	
+				
+		}
+			
+	}
+				
+				
+}
+
 void solveStandardQuery(QueryState* query){
 
-	//cout << "SOLVING QUERY " << query._sname << endl;
 	query->_readyForUse = false;
 
-	//cout << "checking direct cache " << query._sname << endl;
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex.lock();
 	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query->_sname);
@@ -562,7 +588,6 @@ void solveStandardQuery(QueryState* query){
 		
 		}
 		
-		//cout << "checking indirect cache " << query._sname << endl;
 		cacheMutex.lock();
 		vector<shared_ptr<ResourceRecord> >* indirectCached = getRecordsFromCache(currDomain);
 		if(indirectCached != NULL){
@@ -576,7 +601,6 @@ void solveStandardQuery(QueryState* query){
 	
 	}
 	
-	//cout << "adding safeties" << query._sname << endl;
 	//add safety belt servers on at the end, these are assumed to be correct so no further investigation needed.
 	for(auto safetyIter = safety.begin(); safetyIter < safety.end(); safetyIter++){
 	
@@ -586,10 +610,6 @@ void solveStandardQuery(QueryState* query){
 	
 	}
 		
-	//one thread devoted to each nameserver for resolving the current query.
-	//if a nameserver does not yet have an address, use the nameserver's thread to resolve its address.
-	//if a nameserver has multiple ips on record, they are all investigated on the same thread for simplicity.
-	//cout << "asking nameservers " << query._sname << endl;
 	size_t servIndex = 0;
 	
 	while(true){
@@ -597,61 +617,24 @@ void solveStandardQuery(QueryState* query){
 		vector<QueryState>& nsServers = query->_nextServers;
 		query->_servMutex->lock();
 		size_t servSizeBefore = nsServers.size();
-		cout << servSizeBefore << endl;
 		sort(query->_nextServers.begin(), query->_nextServers.end(), [](QueryState& q1, QueryState& q2){ return q1._matchScore > q2._matchScore;} );
-		//if(servIndex >= servSizeBefore){
-		//	servIndex = 0;
-		//	query->_servMutex->unlock();
-		//	continue;
-		//}
 		QueryState& currS = nsServers[servIndex];
 		query->_servMutex->unlock();
 		
-		//cout << "here " <<endl;
-		decrementOps(query);
 		if(query->haveLocalOpsLeft() && query->haveGlobalOpsLeft()){
 		
-			//cout << query._sname << " has ops left" << endl;
-		
-			thread workThr( [&](){
+			if(currS.haveLocalOpsLeft()){
+				cout << "current query: " << query->_sname << " current ns: " << currS._sname << " trying" << endl; 
+				thread workThr(threadFunction, &currS, query);
+				workThr.detach();	 
+				servIndex++;	
 			
+			}
+			else{
 			
-				if(currS._readyForUse){
+				cout << "current query: " << query->_sname << " current ns: " << currS._sname << " ignoring" << endl; 
+			}
 				
-					cout << query->_sname << " ns " << currS._sname << " ready for use" << endl;
-			
-					if(currS._answers.size() < 1){
-						solveStandardQuery(&currS);
-					}
-					else{
-					
-						vector<string>& nsAns = currS._answers;
-						size_t ansIndex = 0;
-						while(true){
-						
-							currS._ansMutex->lock();
-							size_t ansSize = nsAns.size();
-							if(ansIndex >= ansSize){
-								currS._ansMutex->unlock();
-								break;
-							}
-							string ans = nsAns[ansIndex];
-							currS._ansMutex->unlock();
-							
-							//cout << "Answering " << query._sname << " with " << ans << " " << currS._sname << " id " << currS._id << endl;
-							sendStandardQuery(ans, query);
-							ansIndex++;
-							
-						}
-				
-					}
-			
-				}
-				
-			});
-			
-			workThr.detach();	 
-			servIndex++;	
 			
 			
 		}

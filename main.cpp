@@ -26,6 +26,22 @@ int main(int argc, char** argv){
 	QueryState* q = new QueryState(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
 	solveStandardQuery(q);
 	
+	while(true){
+		q->_servMutex->lock();
+		if(q->_answers.size() > 0){
+		
+			cout << "ANSWERS " << endl;
+			for(auto iter = q->_answers.begin(); iter < q->_answers.end(); iter++){
+				cout << *iter << endl;
+			}
+			q->_ansMutex->unlock();
+			break;
+		}
+		q->_servMutex->unlock();
+		
+	
+	
+	}
 	return 0;
 
 
