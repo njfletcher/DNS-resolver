@@ -102,7 +102,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sn
 	_msgCode = (uint8_t) ResponseCodes::none;
 	
 	_numOpsLocalLeft = perSequenceOpCap;
-	_numOpsGlobalLeft = make_shared<unsigned int>(perSequenceOpCap);
+	_numOpsGlobalLeft = make_shared<unsigned int>();
 	
 	_opMutex = make_shared<std::mutex>();
 	_ansMutex = make_shared<std::mutex>();
@@ -114,9 +114,9 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState
 
 	_numOpsLocalLeft = perQueryOpCap;
 	
-	_opMutex = make_shared<std::mutex>();
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
+	_opMutex = q._opMutex;
 	
 	 _numOpsGlobalLeft = q._numOpsGlobalLeft;
 	
@@ -397,15 +397,14 @@ void decrementOps(QueryState* q){
 	if(opsL > 0){
 		opsL = opsL - 1;
 	}
-
-	q->_opMutex->lock();
 	
+	q->_opMutex->lock();
 	unsigned int& opsG = *(q->_numOpsGlobalLeft);
 	if(opsG > 0){
 		opsG = opsG - 1;
 	}
-	
 	q->_opMutex->unlock();
+
 
 }
 
@@ -416,12 +415,10 @@ bool QueryState::haveLocalOpsLeft(){
 
 bool QueryState::haveGlobalOpsLeft(){
 
-	unsigned int gOps;
 	_opMutex->lock();
-	gOps = *_numOpsGlobalLeft;
+	unsigned int opsG = *_numOpsGlobalLeft;
 	_opMutex->unlock();
-	return (gOps >= 1);
-
+	return (opsG >= 1);
 }
 
 
@@ -609,45 +606,41 @@ void solveStandardQuery(QueryState* query){
 		query->expandNextServerAnswer(safeNs.second, safeNs.first);
 	
 	}
-		
-	size_t servIndex = 0;
 	
 	while(true){
 	
-		vector<QueryState>& nsServers = query->_nextServers;
+		vector<QueryState*> nextServers;	
+		vector<thread> threads;
+	
 		query->_servMutex->lock();
-		size_t servSizeBefore = nsServers.size();
 		sort(query->_nextServers.begin(), query->_nextServers.end(), [](QueryState& q1, QueryState& q2){ return q1._matchScore > q2._matchScore;} );
-		QueryState& currS = nsServers[servIndex];
+		for(auto iter = query->_nextServers.begin(); iter < query->_nextServers.end(); iter++){
+			QueryState& ns = *iter;
+			if(ns.haveLocalOpsLeft()){
+				nextServers.push_back(&ns);
+			}
+			
+		}
 		query->_servMutex->unlock();
 		
-		if(query->haveLocalOpsLeft() && query->haveGlobalOpsLeft()){
-		
-			if(currS.haveLocalOpsLeft()){
-				cout << "current query: " << query->_sname << " current ns: " << currS._sname << " trying" << endl; 
-				thread workThr(threadFunction, &currS, query);
-				workThr.detach();	 
-				servIndex++;	
+		for(auto iter = nextServers.begin(); iter < nextServers.end(); iter++){
 			
-			}
-			else{
+			QueryState* currS = *iter;
 			
-				cout << "current query: " << query->_sname << " current ns: " << currS._sname << " ignoring" << endl; 
+			if(query->haveLocalOpsLeft() && query->haveGlobalOpsLeft()){
+				cout << "current query: " << query->_sname << " current ns: " << currS->_sname << " trying" << endl; 
+				threads.push_back(thread(threadFunction, currS, query));
 			}
 				
 			
-			
-		}
-		else{
-		
-			break;
-		
 		}
 		
+		for(auto iter = threads.begin(); iter < threads.end(); iter++){
+			iter->join();
+		}
+				
 	}
-	
 
-	
 }
 
 

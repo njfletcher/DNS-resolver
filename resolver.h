@@ -9,13 +9,14 @@
 #include <ctime>
 #include <mutex>
 #include <thread>
+#include <atomic>
 
 #define maxDomainNameLen 255
 
 //operation capping to make sure threads dont go out of control or network errors cause program to run forever.
 //a thread spawn or network request is one operation decrement
-#define perQueryOpCap 10
-#define perSequenceOpCap 50
+#define perQueryOpCap 20
+#define perSequenceOpCap 100
 
 class DNSMessage;
 
