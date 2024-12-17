@@ -12,7 +12,6 @@
 
 using namespace std;
 
-DNSFlags::DNSFlags(){};
 DNSFlags::DNSFlags(uint8_t qr, uint8_t opcode, uint8_t aa, uint8_t tc, uint8_t rd, uint8_t ra, uint8_t z, uint8_t rcode): _qr(qr), _opcode(opcode), _aa(aa), _tc(tc), _rd(rd), _ra(ra), _z(z), _rcode(rcode){};
 
 //iter is assumed to point to the start of the flags section
@@ -89,8 +88,6 @@ void DNSFlags::print(){
 
 }
 
-
-DNSHeader::DNSHeader(){};
 
 DNSHeader::DNSHeader(uint16_t transId, const DNSFlags& flags, uint16_t numQuestions, uint16_t numAnswers, uint16_t numAuthRR, uint16_t numAdditRR): _transId(transId), _flags(flags), _numQuestions(numQuestions),_numAnswers(numAnswers), _numAuthRR(numAuthRR), _numAdditRR(numAdditRR){};
 
@@ -460,7 +457,14 @@ string convertOctetSeqToString(const vector<uint8_t> & nameSequence){
 
 }
 
-QuestionRecord::QuestionRecord(){};
+QuestionRecord::QuestionRecord(const QuestionRecord& rec){
+
+	_name = rec._name;
+	_realName = rec._realName;
+	_qType = rec._qType;
+	_qClass = rec._qClass;
+
+}
 
 QuestionRecord::QuestionRecord(const char * name, uint16_t qType, uint16_t qClass): _qType(qType), _qClass(qClass) {
 
@@ -522,8 +526,6 @@ void QuestionRecord::print(uint16_t number){
 
 }
 
-
-ResourceRecord::ResourceRecord(){};
 
 ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, vector<uint8_t> rData): _rType(rType), _rClass(rClass), _ttl(ttl), _rdLength(rdLength){
 
@@ -713,9 +715,17 @@ void AResourceRecord::affectNameServers(QueryState* q){
 	q->_servMutex->unlock();
 }
 
-DNSMessage::DNSMessage(){};
 
-DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, vector<shared_ptr<ResourceRecord> >& answer, vector<shared_ptr<ResourceRecord> >& authority, vector<shared_ptr<ResourceRecord> >& additional): _hdr(hdr), _question(question), _answer(answer), _authority(authority), _additional(additional){};
+DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, vector<shared_ptr<ResourceRecord> >& answer, vector<shared_ptr<ResourceRecord> >& authority, vector<shared_ptr<ResourceRecord> >& additional){
+
+	_question = question;
+	_hdr = hdr;
+	_answer = answer;
+	_authority = authority;
+	_additional = additional;
+
+
+};
 
 
 

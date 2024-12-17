@@ -26,6 +26,8 @@ vector<uint16_t> takenIds;
 mutex cacheMutex;
 unordered_map<string, vector< shared_ptr<ResourceRecord> > > cache;
 
+mutex printMutex;
+
 void dumpCacheToFile(){
 
 	ofstream ot("cacheDump.txt");
@@ -102,7 +104,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sn
 	_msgCode = (uint8_t) ResponseCodes::none;
 	
 	_numOpsLocalLeft = perSequenceOpCap;
-	_numOpsGlobalLeft = make_shared<unsigned int>();
+	_numOpsGlobalLeft = make_shared<unsigned int>(perSequenceOpCap);
 	
 	_opMutex = make_shared<std::mutex>();
 	_ansMutex = make_shared<std::mutex>();
@@ -204,8 +206,6 @@ vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 
 //assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
 void QueryState::cacheRecords(DNSMessage& msg){
-
-	cout << "caching records " << endl;
 
 	for(auto iter = msg._answer.begin(); iter < msg._answer.end(); iter++){
 	
@@ -315,13 +315,8 @@ void QueryState::expandNextServers(string domainName){
 		}
 	}			
 	if(isUniqueName){
-		cout << domainName << " unique " << endl;
 		_nextServers.emplace_back(domainName, _stype, _sclass, *this);
 		_nextServers[_nextServers.size()-1].setMatchScore(_sname);
-	}
-	else{
-		cout << domainName << " not unique " <<endl;
-	
 	}
 	_servMutex->unlock();
 
@@ -426,9 +421,6 @@ void sendStandardQuery(string nameServerIp, QueryState* state){
 
 	//if(!state->haveLocalOpsLeft() || !state->haveGlobalOpsLeft()) return;
 	
-	cout << "sending request to " << nameServerIp << " to solve " << state->_sname << endl;
-		
-	
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
 	DNSHeader hdr(state->_id, flg, 1, 0, 0,0);
 	QuestionRecord q(state->_sname.c_str(), state->_stype , state->_sclass );
@@ -447,7 +439,7 @@ void sendStandardQuery(string nameServerIp, QueryState* state){
 	
 	if(networkResult == (int) NetworkErrors::none){
 		auto iter = resp.begin();
-		DNSMessage msg = DNSMessage(iter, iter, resp.end());
+		DNSMessage msg(iter, iter, resp.end());
 		state->_msgCode = msg._hdr._flags._rcode;
 		
 		state->extractDataFromResponse(msg);
@@ -515,34 +507,32 @@ void QueryState::setMatchScore(string domainName){
 void threadFunction(QueryState* currS,QueryState* query){
 
 	decrementOps(query);
-
-	if(currS->_readyForUse){
-	
-		vector<string> answers;
+	vector<string> answers;
 		
-		currS->_ansMutex->lock();
-		for(auto iter = currS->_answers.begin(); iter < currS->_answers.end(); iter++){
-			answers.push_back(*iter);
-		}
-		currS->_ansMutex->unlock();
-		
-		if(answers.size() < 1){
-			solveStandardQuery(currS);
-		}
-		else{
-			for(auto iter = answers.begin(); iter < answers.end(); iter++){
-				string ans = *iter;
-				decrementOps(currS);
-				sendStandardQuery(ans, query);
-			
-			}	
-			currS->_numOpsLocalLeft = 0;
-				
-		}
-			
+	currS->_ansMutex->lock();
+	for(auto iter = currS->_answers.begin(); iter < currS->_answers.end(); iter++){
+		answers.push_back(*iter);
 	}
+	currS->_ansMutex->unlock();
+		
+	if(answers.size() < 1){
+		solveStandardQuery(currS);
+	}
+	else{
+		for(auto iter = answers.begin(); iter < answers.end(); iter++){
+			string ans = *iter;
+			decrementOps(currS);
+			
+			printMutex.lock();
+			cout << "sending request to " << currS->_sname << "(" << ans << ") to solve " << query->_sname << endl;
+			printMutex.unlock();
+			sendStandardQuery(ans, query);
+			
+		}	
+		currS->_numOpsLocalLeft = 0;
 				
-				
+	}
+					
 }
 
 void solveStandardQuery(QueryState* query){
@@ -612,12 +602,10 @@ void solveStandardQuery(QueryState* query){
 	
 	while(true){
 	
-		cout << "new Iter" << endl;
 		vector<QueryState*> nextServers;
 	
 		query->_servMutex->lock();
 		sort(query->_nextServers.begin(), query->_nextServers.end(), [](QueryState& q1, QueryState& q2){ return q1._matchScore > q2._matchScore;} );
-		cout << query->_nextServers.size() << endl;
 		for(auto iter = query->_nextServers.begin(); iter < query->_nextServers.end(); iter++){
 			QueryState& ns = *iter;
 			if(ns.haveLocalOpsLeft() && ns._readyForUse){
@@ -627,15 +615,11 @@ void solveStandardQuery(QueryState* query){
 			
 		}
 		query->_servMutex->unlock();
-		
 		for(auto iter = nextServers.begin(); iter < nextServers.end(); iter++){
 			
 			QueryState* currS = *iter;
 			
-			cout << "serv " << currS->_sname << endl;
-			
 			if(query->haveLocalOpsLeft() && query->haveGlobalOpsLeft()){
-				cout << "current query: " << query->_sname << " current ns: " << currS->_sname << " trying" << endl; 
 				thread workThr(threadFunction, currS, query);
 				workThr.detach();
 			}
