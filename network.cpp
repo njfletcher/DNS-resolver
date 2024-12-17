@@ -40,7 +40,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 		cout << "invalid ip conversion" << endl;
 		return (int)NetworkErrors::user;
 	}
-	cout << "sending to server " << inet_ntoa(serverAddr.sin_addr) << endl;
+	//cout << "sending to server " << inet_ntoa(serverAddr.sin_addr) << endl;
 	
 	if(msg.empty()){
 		cout << "need a message to send" << endl;
@@ -78,7 +78,6 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 	uint8_t buffer[responseSize] = {0};
 	
-	socklen_t outSize;
 	int bytesRec = recv(clientSocket, buffer, sizeof(buffer), 0);
 	
 	//cout << bytesRec << endl;
@@ -99,7 +98,11 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	*/
 	
 	close(clientSocket);
-	resp = vector<uint8_t>(buffer,buffer + (responseSize * sizeof(uint8_t)));
+	
+	for(int i = 0; i < bytesRec; i++){
+		resp.push_back(buffer[i]);
+	
+	}
 	
 	return (int)NetworkErrors::none;
 

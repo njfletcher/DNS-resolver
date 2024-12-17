@@ -251,7 +251,6 @@ void convertBufferNameToVector(vector<uint8_t>::iterator mainMsgStart, vector<ui
 		optStart = optMsg->begin();
 	}
 	
-	vector<uint8_t>::iterator start = (optMsg != NULL) ? optStart : mainMsgStart;
 	vector<uint8_t>::iterator & iter = (optMsg != NULL) ? optStart : mainMsgIter;
 	vector<uint8_t>::iterator end = (optMsg != NULL) ? optMsg->end() : mainMsgEnd;
 		

@@ -358,7 +358,6 @@ void QueryState::extractDataFromResponse(DNSMessage& msg){
 		}
 		
 		if(_answers.size() > 0){
-			_numOpsLocalLeft=0;
 			return;
 		}
 	
@@ -425,9 +424,12 @@ void sendStandardQuery(string nameServerIp, QueryState* state){
 	DNSHeader hdr(state->_id, flg, 1, 0, 0,0);
 	QuestionRecord q(state->_sname.c_str(), state->_stype , state->_sclass );
 	
-	vector<QuestionRecord> qr = {q};
-	vector<shared_ptr<ResourceRecord>> rr;
-	DNSMessage msg(hdr, qr, rr, rr, rr );
+	vector<QuestionRecord> qr;
+	qr.push_back(q);
+	vector<shared_ptr<ResourceRecord>> rr1;
+	vector<shared_ptr<ResourceRecord>> rr2;
+	vector<shared_ptr<ResourceRecord>> rr3;
+	DNSMessage msg(hdr, qr, rr1, rr2, rr3);
 	
 	vector<uint8_t> buff;
 	vector<uint8_t> resp;
@@ -512,6 +514,9 @@ void threadFunction(QueryState* currS,QueryState* query){
 	currS->_ansMutex->lock();
 	for(auto iter = currS->_answers.begin(); iter < currS->_answers.end(); iter++){
 		answers.push_back(*iter);
+		//printMutex.lock();
+		//cout << "NS answer " << *iter << endl;
+		//printMutex.unlock();
 	}
 	currS->_ansMutex->unlock();
 		
@@ -523,9 +528,9 @@ void threadFunction(QueryState* currS,QueryState* query){
 			string ans = *iter;
 			decrementOps(currS);
 			
-			printMutex.lock();
-			cout << "sending request to " << currS->_sname << "(" << ans << ") to solve " << query->_sname << endl;
-			printMutex.unlock();
+			//printMutex.lock();
+			//cout << "sending request to " << currS->_sname << "(" << ans << ") to solve " << query->_sname << endl;
+			//printMutex.unlock();
 			sendStandardQuery(ans, query);
 			
 		}	
@@ -627,8 +632,25 @@ void solveStandardQuery(QueryState* query){
 			
 		}
 		
+		
+		query->_ansMutex->lock();
+		if(query->_answers.size() > 0){
+			query->_ansMutex->unlock();
+			break;
+		}
+		query->_ansMutex->unlock();
+		
+		
 				
 	}
+	
+	query->_ansMutex->lock();
+	for(auto iter = query->_answers.begin(); iter < query->_answers.end(); iter++){
+		//printMutex.lock();
+		//cout << "ANSWER " << query->_sname << " " << *iter << endl;
+		//printMutex.unlock();
+	}
+	query->_ansMutex->unlock();
 
 }
 
