@@ -424,7 +424,9 @@ bool QueryState::haveGlobalOpsLeft(){
 
 void sendStandardQuery(string nameServerIp, QueryState* state){
 
-	if(!state->haveLocalOpsLeft() || !state->haveGlobalOpsLeft()) return;
+	//if(!state->haveLocalOpsLeft() || !state->haveGlobalOpsLeft()) return;
+	
+	cout << "sending request to " << nameServerIp << " to solve " << state->_sname << endl;
 		
 	
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
@@ -534,6 +536,7 @@ void threadFunction(QueryState* currS,QueryState* query){
 				sendStandardQuery(ans, query);
 			
 			}	
+			currS->_numOpsLocalLeft = 0;
 				
 		}
 			
@@ -609,15 +612,17 @@ void solveStandardQuery(QueryState* query){
 	
 	while(true){
 	
-		vector<QueryState*> nextServers;	
-		vector<thread> threads;
+		cout << "new Iter" << endl;
+		vector<QueryState*> nextServers;
 	
 		query->_servMutex->lock();
 		sort(query->_nextServers.begin(), query->_nextServers.end(), [](QueryState& q1, QueryState& q2){ return q1._matchScore > q2._matchScore;} );
+		cout << query->_nextServers.size() << endl;
 		for(auto iter = query->_nextServers.begin(); iter < query->_nextServers.end(); iter++){
 			QueryState& ns = *iter;
-			if(ns.haveLocalOpsLeft()){
+			if(ns.haveLocalOpsLeft() && ns._readyForUse){
 				nextServers.push_back(&ns);
+				ns._readyForUse = false;
 			}
 			
 		}
@@ -627,17 +632,17 @@ void solveStandardQuery(QueryState* query){
 			
 			QueryState* currS = *iter;
 			
+			cout << "serv " << currS->_sname << endl;
+			
 			if(query->haveLocalOpsLeft() && query->haveGlobalOpsLeft()){
 				cout << "current query: " << query->_sname << " current ns: " << currS->_sname << " trying" << endl; 
-				threads.push_back(thread(threadFunction, currS, query));
+				thread workThr(threadFunction, currS, query);
+				workThr.detach();
 			}
 				
 			
 		}
 		
-		for(auto iter = threads.begin(); iter < threads.end(); iter++){
-			iter->join();
-		}
 				
 	}
 
