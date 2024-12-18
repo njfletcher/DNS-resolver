@@ -110,7 +110,7 @@ class QueryState{
 		int _matchScore;
 		
 		//name servers this request thinks will be helpful
-		std::vector<QueryState> _nextServers;
+		std::vector<std::shared_ptr<QueryState> > _nextServers;
 		
 				
 		//absolute time the request started
@@ -136,7 +136,7 @@ class QueryState{
 		
 		~QueryState();
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
-		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState& q);
+		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState* q);
 		
 		void expandAnswers(std::string answer);
 		void expandNextServerAnswer(std::string server, std::string answer);
@@ -144,11 +144,9 @@ class QueryState{
 				
 		bool haveLocalOpsLeft();
 		bool haveGlobalOpsLeft();
-		void extractDataFromResponse(DNSMessage& msg);
 		
 		void setMatchScore(std::string domainName);
 		
-	private:
 		bool checkForFatalErrors();
 		void cacheRecords(DNSMessage& msg);
 		bool checkForResponseErrors(DNSMessage& msg);
@@ -156,7 +154,7 @@ class QueryState{
 };
 
 void loadSafeties(std::string filePath);
-void solveStandardQuery(QueryState* query);
+void solveStandardQuery(std::shared_ptr<QueryState> query);
 void dumpCacheToFile();
 
 

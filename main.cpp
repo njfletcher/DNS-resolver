@@ -23,7 +23,7 @@ int main(int argc, char** argv){
 	loadSafeties(argv[2]);
 
 	
-	QueryState* q = new QueryState(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
+	shared_ptr<QueryState> q = make_shared<QueryState>(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
 	solveStandardQuery(q);
 	
 	return 0;

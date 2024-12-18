@@ -579,8 +579,8 @@ string ResourceRecord::getDataAsString(){
 	return s;
 }
 
-void ResourceRecord::affectAnswers(QueryState* q){ return;}
-void ResourceRecord::affectNameServers(QueryState* q){ return; }
+void ResourceRecord::affectAnswers(shared_ptr<QueryState> q){ return;}
+void ResourceRecord::affectNameServers(shared_ptr<QueryState> q){ return; }
 
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
@@ -654,11 +654,12 @@ string NSResourceRecord::getDataAsString(){
 	return _domain;
 }
 
-void NSResourceRecord::affectAnswers(QueryState* q){ return; }
-void NSResourceRecord::affectNameServers(QueryState* q){
+void NSResourceRecord::affectAnswers(shared_ptr<QueryState> q){ return; }
+void NSResourceRecord::affectNameServers(shared_ptr<QueryState> q){
 
 	q->expandNextServers(getDataAsString());
 }
+
 string convertIpIntToString(uint32_t ip){
 
 	char buffer[INET_ADDRSTRLEN];
@@ -695,19 +696,19 @@ string AResourceRecord::getDataAsString(){
 	return convertIpIntToString(_ip);
 }
 
-void AResourceRecord::affectAnswers(QueryState* q){ 
+void AResourceRecord::affectAnswers(shared_ptr<QueryState> q){ 
 
 	q->expandAnswers(getDataAsString());
 
 }
-void AResourceRecord::affectNameServers(QueryState* q){
-
-	vector<QueryState>& servs = q->_nextServers;
-				
+void AResourceRecord::affectNameServers(shared_ptr<QueryState> q){
+			
 	q->_servMutex->lock();
-	for (auto servIter = servs.begin(); servIter < servs.end(); servIter++){
-		if(servIter->_sname == _realName){
-			servIter->expandAnswers(getDataAsString());
+	for (auto servIter = q->_nextServers.begin(); servIter < q->_nextServers.end(); servIter++){
+		shared_ptr<QueryState> qr = *servIter;
+		
+		if(qr->_sname == _realName){
+			qr->expandAnswers(getDataAsString());
 					
 		}
 	}
