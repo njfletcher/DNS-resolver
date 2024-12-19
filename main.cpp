@@ -26,6 +26,10 @@ int main(int argc, char** argv){
 	shared_ptr<QueryState> q = make_shared<QueryState>(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
 	solveStandardQuery(q);
 	
+	dumpCacheToFile();
+	
+	displayResult(*q);
+	
 	return 0;
 
 

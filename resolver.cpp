@@ -32,6 +32,7 @@ void dumpCacheToFile(){
 
 	ofstream ot("cacheDump.txt");
 	
+	cacheMutex.lock();
 	for(auto iter = cache.begin(); iter != cache.end(); iter++){
 		
 		vector<shared_ptr<ResourceRecord> >& lr = iter->second;
@@ -46,6 +47,7 @@ void dumpCacheToFile(){
 	
 	
 	}
+	cacheMutex.unlock();
 	
 	
 }
@@ -266,21 +268,6 @@ bool QueryState::checkForResponseErrors(DNSMessage& resp){
 
 }
 
-bool QueryState::checkForFatalErrors(){
-
-
-	if(_msgCode == (uint8_t) ResponseCodes::name){
-	
-		return true;
-	
-	}
-	
-
-	return false;
-
-}
-
-
 void QueryState::expandAnswers(string answer){
 		
 	_ansMutex->lock();
@@ -419,8 +406,6 @@ bool QueryState::haveGlobalOpsLeft(){
 
 void sendStandardQuery(string nameServerIp, shared_ptr<QueryState> state){
 
-	//if(!state->haveLocalOpsLeft() || !state->haveGlobalOpsLeft()) return;
-	
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
 	DNSHeader hdr(state->_id, flg, 1, 0, 0,0);
 	QuestionRecord q(state->_sname.c_str(), state->_stype , state->_sclass );
@@ -475,6 +460,58 @@ void splitDomainName(string domainName, vector<string>& splits){
 	splits.push_back("");
 
 
+}
+
+bool checkEndCondition(QueryState& q){
+
+	bool end = false;
+	
+	if(!q.haveGlobalOpsLeft()) end = true;
+	
+	if(!q.haveLocalOpsLeft()) end = true;
+	
+	if(q._msgCode == (uint8_t)ResponseCodes::name || q._msgCode == (uint8_t)ResponseCodes::format) end = true;
+	
+	q._ansMutex->lock();
+	if(q._answers.size() > 0) end = true;
+	q._ansMutex->unlock();
+	
+	return end; 
+
+}
+
+void displayResult(QueryState& q){
+
+
+	printMutex.lock();
+	if(!q.haveGlobalOpsLeft()){
+		cout << "query ran out of global ops" << endl;
+	
+	}
+	
+	if(!q.haveLocalOpsLeft()){
+		cout << "query ran out of local ops" << endl;
+	
+	}
+	
+	if(q._msgCode == (uint8_t)ResponseCodes::name || q._msgCode == (uint8_t)ResponseCodes::format){
+	
+		cout << "query encountered a fatal error" << endl;
+	}
+	
+	q._ansMutex->lock();
+	if(q._answers.size() > 0){
+		cout << "query got answers : " << endl;
+		for(auto iter = q._answers.begin(); iter< q._answers.end(); iter++){
+		
+			cout << "ANSWER " << *iter << endl;
+		}
+	
+	}
+	q._ansMutex->unlock();
+	
+	printMutex.unlock();
+	
 }
 
 void QueryState::setMatchScore(string domainName){
@@ -543,7 +580,7 @@ void threadFunction(shared_ptr<QueryState> currS,shared_ptr<QueryState> query){
 
 void solveStandardQuery(shared_ptr<QueryState> query){
 
-	query->_readyForUse = false;
+	query->_beingUsed = true;
 
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex.lock();
@@ -563,7 +600,7 @@ void solveStandardQuery(shared_ptr<QueryState> query){
 	query->_ansMutex->unlock();
 	
 	if(ansSize > 0){
-		query->_readyForUse = true; 
+		query->_beingUsed = false; 
 		return; 
 	}
 	
@@ -614,9 +651,9 @@ void solveStandardQuery(shared_ptr<QueryState> query){
 		sort(query->_nextServers.begin(), query->_nextServers.end(), [](shared_ptr<QueryState> q1, shared_ptr<QueryState> q2){ return q1->_matchScore > q2->_matchScore;} );
 		for(auto iter = query->_nextServers.begin(); iter < query->_nextServers.end(); iter++){
 			shared_ptr<QueryState> ns = *iter;
-			if(ns->haveLocalOpsLeft() && ns->_readyForUse){
+			if(ns->haveLocalOpsLeft() && !ns->_beingUsed){
 				nextServers.push_back(ns);
-				ns->_readyForUse = false;
+				ns->_beingUsed = true;
 			}
 			
 		}
@@ -633,26 +670,10 @@ void solveStandardQuery(shared_ptr<QueryState> query){
 			
 		}
 		
-		
-		query->_ansMutex->lock();
-		if(query->_answers.size() > 0){
-			query->_ansMutex->unlock();
-			break;
-		}
-		query->_ansMutex->unlock();
-		
-		
-				
+		if(checkEndCondition(*query)) break;
+			
 	}
 	
-	query->_ansMutex->lock();
-	for(auto iter = query->_answers.begin(); iter < query->_answers.end(); iter++){
-		printMutex.lock();
-		cout << "ANSWER " << query->_sname << " " << *iter << endl;
-		printMutex.unlock();
-	}
-	query->_ansMutex->unlock();
-
 }
 
 

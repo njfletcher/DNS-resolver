@@ -20,14 +20,6 @@
 
 class DNSMessage;
 
-enum class SessionStates{
-
-	answered = 0,
-	continued = 1,
-	failed = 2
-
-};
-
 enum class qrVals{
 
 	query = 0,
@@ -78,7 +70,7 @@ enum class ResponseCodes{
 
 	none = 0, // no errors
 	format = 1, // the name server was unable to interpret the query
-	server = 2, //The name server wasunable to process this query due to a problem with the name server
+	server = 2, //The name server was unable to process this query due to a problem with the name server
 	name = 3, //Meaningful only for responses from an authoritative name server, this code signifies that the domain name referenced in the query does  not exist.
 	implement = 4, //The name server does not support the requested kind of query
 	refused = 5 //The name server refuses to perform the specified operation for policy reasons.  For example, 
@@ -91,9 +83,8 @@ class QueryState{
 
 	public:
 	
-		//is this querysInformation able to be used?
-		//will be false if this query's answers are being gathered or some query is being resolved using this one 
-		bool _readyForUse;
+		//true if this query state is currently being answered by some thread. this avoids double resolving
+		bool _beingUsed;
 	
 		//id of the original query
 		uint16_t _id;
@@ -147,7 +138,6 @@ class QueryState{
 		
 		void setMatchScore(std::string domainName);
 		
-		bool checkForFatalErrors();
 		void cacheRecords(DNSMessage& msg);
 		bool checkForResponseErrors(DNSMessage& msg);
 		
@@ -156,6 +146,7 @@ class QueryState{
 void loadSafeties(std::string filePath);
 void solveStandardQuery(std::shared_ptr<QueryState> query);
 void dumpCacheToFile();
+void displayResult(QueryState& q);
 
 
 

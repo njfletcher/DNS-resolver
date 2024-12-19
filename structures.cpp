@@ -729,16 +729,13 @@ DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, v
 
 
 
-shared_ptr<ResourceRecord> GetCorrectResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
+shared_ptr<ResourceRecord> ResourceRecord::GetSpecialResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
 
-	vector<uint8_t>::iterator locIter = iter;
-	ResourceRecord r = ResourceRecord(start, locIter, end, succeeded);
-	
-	if(r._rType == (uint16_t) ResourceTypes::a){
+	if(_rType == (uint16_t) ResourceTypes::a){
 		
 		return make_shared<AResourceRecord>(start,iter,end,succeeded);
 	}
-	else if(r._rType == (uint16_t) ResourceTypes::ns){
+	else if(_rType == (uint16_t) ResourceTypes::ns){
 	
 		return make_shared<NSResourceRecord>(start,iter,end,succeeded);
 	
@@ -767,17 +764,23 @@ DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::i
 	
 	for(uint16_t i = 0; (i < _hdr._numAnswers) && recordSucceeded; i++){
 	
-		_answer.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
+		vector<uint8_t>::iterator locIter = iter;
+		ResourceRecord r = ResourceRecord(start, locIter, end, recordSucceeded);
+		_answer.push_back(r.GetSpecialResourceRecord(start,iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAuthRR) && recordSucceeded; i++){
 	
-		_authority.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
+		vector<uint8_t>::iterator locIter = iter;
+		ResourceRecord r = ResourceRecord(start, locIter, end, recordSucceeded);
+		_authority.push_back(r.GetSpecialResourceRecord(start,iter,end,recordSucceeded));
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAdditRR) && recordSucceeded; i++){
 	
-		_additional.push_back(GetCorrectResourceRecord(start,iter,end,recordSucceeded));
+		vector<uint8_t>::iterator locIter = iter;
+		ResourceRecord r = ResourceRecord(start, locIter, end, recordSucceeded);
+		_additional.push_back(r.GetSpecialResourceRecord(start,iter,end,recordSucceeded));
 	}
 
 
