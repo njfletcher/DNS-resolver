@@ -28,7 +28,7 @@ int main(int argc, char** argv){
 	
 	dumpCacheToFile();
 	
-	displayResult(*q);
+	q->displayResult();
 	
 	return 0;
 

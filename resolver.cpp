@@ -96,7 +96,7 @@ QueryState::~QueryState(){
 QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sname), _stype(stype), _sclass(sclass){ 
 
 
-	_readyForUse = true;
+	_beingUsed = false;
 	_id = pickNextId();
 	_matchScore = 0;
 	
@@ -124,16 +124,12 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState
 	
 	 _numOpsGlobalLeft = q->_numOpsGlobalLeft;
 	
-	_readyForUse = true;
+	_beingUsed = false;
 	_networkCode = (int) NetworkErrors::none;
 	_msgCode = (uint8_t) ResponseCodes::none;
 	_startTime = time(NULL);
 	_id = pickNextId();
 }
-
-
-
-
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
 void loadSafeties(string filePath){
@@ -168,19 +164,6 @@ void loadSafeties(string filePath){
 }
 
 
-
-void insertRecordIntoCache(shared_ptr<ResourceRecord>& r){
-
-	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
-	if(r->_ttl > 0){
-		cacheMutex.lock();
-		vector<shared_ptr<ResourceRecord> >& records = cache[r->_realName];
-		records.push_back(r);
-		cacheMutex.unlock();
-	}
-
-}
-
 //this method does not have mutex locking in it. the calling context is expected to lock instead in order to use the returned vector of records safely
 vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 
@@ -205,68 +188,6 @@ vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 
 }
 
-
-//assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
-void QueryState::cacheRecords(DNSMessage& msg){
-
-	for(auto iter = msg._answer.begin(); iter < msg._answer.end(); iter++){
-	
-		shared_ptr<ResourceRecord>& r = *iter;
-		r->_cacheExpireTime = _startTime + r->_ttl;
-		insertRecordIntoCache(r);
-	
-	}
-	
-	for(auto iter = msg._authority.begin(); iter < msg._authority.end(); iter++){
-	
-		shared_ptr<ResourceRecord>& r = *iter;
-		r->_cacheExpireTime = _startTime + r->_ttl;
-		insertRecordIntoCache(r);
-	
-	}
-	
-	for(auto iter = msg._additional.begin(); iter < msg._additional.end(); iter++){
-	
-		shared_ptr<ResourceRecord>& r = *iter;
-		r->_cacheExpireTime = _startTime + r->_ttl;
-		insertRecordIntoCache(r);
-	
-	}
-	
-
-}
-
-bool QueryState::checkForResponseErrors(DNSMessage& resp){
-
-
-	if(_networkCode != (int) NetworkErrors::none){
-	
-		return true;
-	}
-
-
-	if(resp._hdr._flags._qr != (uint8_t) qrVals::response){
-	
-		return true;
-	
-	}
-	
-	uint8_t respCode = resp._hdr._flags._rcode;
-	if(respCode != (uint8_t) ResponseCodes::none){
-	
-		return true;
-	
-	}
-	
-	if(_id != resp._hdr._transId){
-	
-		return true;
-	
-	}
-
-	return false;
-
-}
 
 void QueryState::expandAnswers(string answer){
 		
@@ -328,51 +249,6 @@ void QueryState::expandNextServerAnswer(string domainName, string answer){
 }
 
 
-
-void extractDataFromResponse(DNSMessage& msg, shared_ptr<QueryState> qr){
-
-	if(qr->checkForResponseErrors(msg)) return;
-	else qr->cacheRecords(msg);
-	
-	
-	uint16_t numAnswersClaim = msg._hdr._numAnswers;
-	size_t numAnswersActual = msg._answer.size();
-	//dont need to bother checking if they dont claim there are any answers. But dont trust the claimed number for looping, could be huge or at least incorrect.
-	if(numAnswersClaim > 0){
-		
-		for(size_t i =0; i < numAnswersActual; i++){
-			msg._answer[i]->affectAnswers(qr);
-		
-		}
-		
-		if(qr->_answers.size() > 0){
-			return;
-		}
-	
-	}
-	
-	uint16_t numAuthClaim = msg._hdr._numAuthRR;
-	size_t numAuthActual = msg._authority.size();
-	if(numAuthClaim > 0){
-		for(size_t i =0; i < numAuthActual; i++){
-			msg._authority[i]->affectNameServers(qr);
-		}
-	
-	}
-	
-	uint16_t numAdditClaim = msg._hdr._numAdditRR;
-	size_t numAdditActual = msg._additional.size();
-	if(numAdditClaim > 0){
-		
-		for(size_t i =0; i < numAdditActual; i++){
-			msg._additional[i]->affectNameServers(qr);
-		
-		}
-		
-	}
-	
-} 
-
 void QueryState::decrementOps(){
 
 	unsigned int& opsL = _numOpsLocalLeft;
@@ -404,11 +280,11 @@ bool QueryState::haveGlobalOpsLeft(){
 }
 
 
-void sendStandardQuery(string nameServerIp, shared_ptr<QueryState> state){
+void QueryState::sendStandardQuery(string nameServerIp){
 
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
-	DNSHeader hdr(state->_id, flg, 1, 0, 0,0);
-	QuestionRecord q(state->_sname.c_str(), state->_stype , state->_sclass );
+	DNSHeader hdr(_id, flg, 1, 0, 0,0);
+	QuestionRecord q(_sname.c_str(), _stype , _sclass);
 	
 	vector<QuestionRecord> qr;
 	qr.push_back(q);
@@ -423,14 +299,14 @@ void sendStandardQuery(string nameServerIp, shared_ptr<QueryState> state){
 
 	int networkResult = sendMessageResolverClient(nameServerIp, buff, resp);
 	
-	state->_networkCode = networkResult;
+	_networkCode = networkResult;
 	
 	if(networkResult == (int) NetworkErrors::none){
 		auto iter = resp.begin();
 		DNSMessage msg1(iter, iter, resp.end());
-		state->_msgCode = msg1._hdr._flags._rcode;
-		
-		extractDataFromResponse(msg1,state);
+		if(!msg1.checkForResponseErrors(_id){
+			msg1.extractData(state, state->_msgCode, state->_startTime);
+		}
 	
 	}
 	
@@ -480,35 +356,35 @@ bool QueryState::checkEndCondition(){
 
 }
 
-void displayResult(QueryState& q){
+void QueryState::displayResult(){
 
 
 	printMutex.lock();
-	if(!q.haveGlobalOpsLeft()){
+	if(!haveGlobalOpsLeft()){
 		cout << "query ran out of global ops" << endl;
 	
 	}
 	
-	if(!q.haveLocalOpsLeft()){
+	if(!haveLocalOpsLeft()){
 		cout << "query ran out of local ops" << endl;
 	
 	}
 	
-	if(q._msgCode == (uint8_t)ResponseCodes::name || q._msgCode == (uint8_t)ResponseCodes::format){
+	if(_msgCode == (uint8_t)ResponseCodes::name || _msgCode == (uint8_t)ResponseCodes::format){
 	
 		cout << "query encountered a fatal error" << endl;
 	}
 	
-	q._ansMutex->lock();
-	if(q._answers.size() > 0){
+	_ansMutex->lock();
+	if(_answers.size() > 0){
 		cout << "query got answers : " << endl;
-		for(auto iter = q._answers.begin(); iter< q._answers.end(); iter++){
+		for(auto iter = _answers.begin(); iter< _answers.end(); iter++){
 		
 			cout << "ANSWER " << *iter << endl;
 		}
 	
 	}
-	q._ansMutex->unlock();
+	_ansMutex->unlock();
 	
 	printMutex.unlock();
 	
@@ -569,7 +445,7 @@ void threadFunction(shared_ptr<QueryState> currS,shared_ptr<QueryState> query){
 			//printMutex.lock();
 			//cout << "sending request to " << currS->_sname << "(" << ans << ") to solve " << query->_sname << endl;
 			//printMutex.unlock();
-			sendStandardQuery(ans, query);
+			query->sendStandardQuery(ans);
 			
 		}	
 		currS->_numOpsLocalLeft = 0;

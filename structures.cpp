@@ -638,6 +638,19 @@ void ResourceRecord::print(uint16_t number){
 
 }
 
+void ResourceRecord::insertRecordIntoCache(shared_ptr<ResourceRecord> r, time_t time){
+
+		
+	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
+	if(_ttl > 0){
+		cacheMutex.lock();
+		_cacheExpireTime = time + _ttl;
+		vector<shared_ptr<ResourceRecord> >& records = cache[_realName];
+		records.push_back(r);
+		cacheMutex.unlock();
+	}
+
+}
 
 void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
 	vector<uint8_t> realDomain;
@@ -703,16 +716,8 @@ void AResourceRecord::affectAnswers(shared_ptr<QueryState> q){
 }
 void AResourceRecord::affectNameServers(shared_ptr<QueryState> q){
 			
-	q->_servMutex->lock();
-	for (auto servIter = q->_nextServers.begin(); servIter < q->_nextServers.end(); servIter++){
-		shared_ptr<QueryState> qr = *servIter;
-		
-		if(qr->_sname == _realName){
-			qr->expandAnswers(getDataAsString());
-					
-		}
-	}
-	q->_servMutex->unlock();
+	q->expandNextServerAnswer(_realName, getDataAsString());
+	
 }
 
 
@@ -860,6 +865,98 @@ void DNSMessage::print(){
 	buildString(s);
 	cout << s.str() << endl;
 	
+}
+
+void DNSMessage::extractData(shared_ptr<QueryState> qr, uint8_t& result, std::time_t time){
+
+	result = _hdr._flags._rcode;
+	
+	cacheRecords(time);
+	
+	
+	uint16_t numAnswersClaim = _hdr._numAnswers;
+	size_t numAnswersActual = _answer.size();
+	//dont need to bother checking if they dont claim there are any answers. But dont trust the claimed number for looping, could be huge or at least incorrect.
+	if(numAnswersClaim > 0){
+		
+		for(size_t i =0; i < numAnswersActual; i++){
+			_answer[i]->affectAnswers(qr);
+		
+		}
+	}
+	
+	uint16_t numAuthClaim = _hdr._numAuthRR;
+	size_t numAuthActual = _authority.size();
+	if(numAuthClaim > 0){
+		for(size_t i =0; i < numAuthActual; i++){
+			_authority[i]->affectNameServers(qr);
+		}
+	
+	}
+	
+	uint16_t numAdditClaim = _hdr._numAdditRR;
+	size_t numAdditActual = _additional.size();
+	if(numAdditClaim > 0){
+		
+		for(size_t i =0; i < numAdditActual; i++){
+			_additional[i]->affectNameServers(qr);
+		
+		}
+		
+	}
+	
+} 
+
+//assumes errors have been checked for in the response(Dont want to cache any records that come from a bad response).
+void DNSMessage::cacheRecords(time_t time){
+
+	for(auto iter = _answer.begin(); iter < _answer.end(); iter++){
+	
+		shared_ptr<ResourceRecord>& r = *iter;
+		r->insertRecordIntoCache(r,time);
+	
+	}
+	
+	for(auto iter = _authority.begin(); iter < _authority.end(); iter++){
+	
+		shared_ptr<ResourceRecord>& r = *iter;
+		r->insertRecordIntoCache(r,time);
+	
+	}
+	
+	for(auto iter = _additional.begin(); iter < _additional.end(); iter++){
+	
+		shared_ptr<ResourceRecord>& r = *iter;
+		r->insertRecordIntoCache(r,time);
+	
+	}
+	
+
+}
+
+bool DNSMessage::checkForResponseErrors(uint16_t qId){
+
+	if(_hdr._flags._qr != (uint8_t) qrVals::response){
+	
+		return true;
+	
+	}
+	
+	uint8_t respCode = _hdr._flags._rcode;
+	if(respCode != (uint8_t) ResponseCodes::none){
+	
+		return true;
+	
+	}
+	
+	if(qId != _hdr._transId){
+	
+		return true;
+	
+	}
+
+	return false;
+
 }
 
 

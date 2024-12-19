@@ -12,7 +12,9 @@ class QueryState;
 
 
 class DNSFlags{
-
+	
+	friend class DNSMessage;
+	
 	public:
 			
 		DNSFlags() = default;
@@ -93,6 +95,7 @@ class ResourceRecord{
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s, uint16_t number = 0);
 		void print(uint16_t number = 0);
+		void insertRecordIntoCache(std::shared_ptr<ResourceRecord> r, std::time_t time);
 		
 		std::shared_ptr<ResourceRecord> GetSpecialResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		
@@ -143,6 +146,9 @@ class DNSMessage{
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s);
 		void print();
+		void extractData(std::shared_ptr<QueryState> qr, uint8_t& result, std::time_t time);
+		void cacheRecords(std::time_t time);
+		bool checkForResponseErrors(uint16_t qId);
 		
 	private:
 		DNSHeader _hdr;

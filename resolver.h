@@ -10,6 +10,7 @@
 #include <mutex>
 #include <thread>
 #include <atomic>
+#include <unordered_map>
 
 #define maxDomainNameLen 255
 
@@ -19,6 +20,13 @@
 #define perSequenceOpCap 100
 
 class DNSMessage;
+class ResourceRecord;
+
+extern std::mutex cacheMutex;
+extern std::unordered_map<std::string, std::vector< std::shared_ptr<ResourceRecord> > > cache;
+extern std::mutex printMutex;
+
+
 
 enum class qrVals{
 
@@ -91,15 +99,14 @@ class QueryState{
 		void expandNextServers(std::string server);
 						
 		void setMatchScore(std::string domainName);
-		
-		void cacheRecords(DNSMessage& msg);
-		bool checkForResponseErrors(DNSMessage& msg);
 		void solveStandardQuery();
 		
 		bool checkEndCondition();
+		bool displayResult();
 		bool haveLocalOpsLeft();
 		bool haveGlobalOpsLeft();
 		void decrementOps();
+		void sendStandardQuery(std::string nameServerIp);
 		
 	private:
 	
@@ -125,7 +132,7 @@ class QueryState{
 		
 				
 		//absolute time the request started
-		uint16_t _startTime;
+		std::time_t _startTime;
 		
 		//answers received for this query
 		std::vector<std::string> _answers;
