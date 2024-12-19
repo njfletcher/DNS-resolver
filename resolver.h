@@ -81,7 +81,27 @@ enum class ResponseCodes{
 
 class QueryState{
 
-	public:
+	public:		
+		~QueryState();
+		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
+		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState* q);
+		
+		void expandAnswers(std::string answer);
+		void expandNextServerAnswer(std::string server, std::string answer);
+		void expandNextServers(std::string server);
+						
+		void setMatchScore(std::string domainName);
+		
+		void cacheRecords(DNSMessage& msg);
+		bool checkForResponseErrors(DNSMessage& msg);
+		void solveStandardQuery();
+		
+		bool checkEndCondition();
+		bool haveLocalOpsLeft();
+		bool haveGlobalOpsLeft();
+		void decrementOps();
+		
+	private:
 	
 		//true if this query state is currently being answered by some thread. this avoids double resolving
 		bool _beingUsed;
@@ -124,22 +144,6 @@ class QueryState{
 		//number of operations left for the series of requests that led to this one until failure
 		//0 means sequence has terminated. Same reasons as above.
 		std::shared_ptr<unsigned int> _numOpsGlobalLeft;
-		
-		~QueryState();
-		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
-		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState* q);
-		
-		void expandAnswers(std::string answer);
-		void expandNextServerAnswer(std::string server, std::string answer);
-		void expandNextServers(std::string server);
-				
-		bool haveLocalOpsLeft();
-		bool haveGlobalOpsLeft();
-		
-		void setMatchScore(std::string domainName);
-		
-		void cacheRecords(DNSMessage& msg);
-		bool checkForResponseErrors(DNSMessage& msg);
 		
 };
 

@@ -373,19 +373,19 @@ void extractDataFromResponse(DNSMessage& msg, shared_ptr<QueryState> qr){
 	
 } 
 
-void decrementOps(shared_ptr<QueryState> q){
+void QueryState::decrementOps(){
 
-	unsigned int& opsL = q->_numOpsLocalLeft;
+	unsigned int& opsL = _numOpsLocalLeft;
 	if(opsL > 0){
 		opsL = opsL - 1;
 	}
 	
-	q->_opMutex->lock();
-	unsigned int& opsG = *(q->_numOpsGlobalLeft);
+	_opMutex->lock();
+	unsigned int& opsG = *(_numOpsGlobalLeft);
 	if(opsG > 0){
 		opsG = opsG - 1;
 	}
-	q->_opMutex->unlock();
+	_opMutex->unlock();
 
 
 }
@@ -462,19 +462,19 @@ void splitDomainName(string domainName, vector<string>& splits){
 
 }
 
-bool checkEndCondition(QueryState& q){
+bool QueryState::checkEndCondition(){
 
 	bool end = false;
 	
-	if(!q.haveGlobalOpsLeft()) end = true;
+	if(!haveGlobalOpsLeft()) end = true;
 	
-	if(!q.haveLocalOpsLeft()) end = true;
+	if(!haveLocalOpsLeft()) end = true;
 	
-	if(q._msgCode == (uint8_t)ResponseCodes::name || q._msgCode == (uint8_t)ResponseCodes::format) end = true;
+	if(_msgCode == (uint8_t)ResponseCodes::name || _msgCode == (uint8_t)ResponseCodes::format) end = true;
 	
-	q._ansMutex->lock();
-	if(q._answers.size() > 0) end = true;
-	q._ansMutex->unlock();
+	_ansMutex->lock();
+	if(_answers.size() > 0) end = true;
+	_ansMutex->unlock();
 	
 	return end; 
 
@@ -578,13 +578,13 @@ void threadFunction(shared_ptr<QueryState> currS,shared_ptr<QueryState> query){
 					
 }
 
-void solveStandardQuery(shared_ptr<QueryState> query){
+void QueryState::solveStandardQuery(){
 
-	query->_beingUsed = true;
+	_beingUsed = true;
 
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex.lock();
-	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(query->_sname);
+	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(_sname);
 	if(directCached != NULL){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
@@ -595,17 +595,17 @@ void solveStandardQuery(shared_ptr<QueryState> query){
 	}
 	cacheMutex.unlock();
 	
-	query->_ansMutex->lock();
-	size_t ansSize = query->_answers.size();
-	query->_ansMutex->unlock();
+	_ansMutex->lock();
+	size_t ansSize = _answers.size();
+	_ansMutex->unlock();
 	
 	if(ansSize > 0){
-		query->_beingUsed = false; 
+		_beingUsed = false; 
 		return; 
 	}
 	
 	vector<string> splits;
-	splitDomainName(query->_sname, splits);
+	splitDomainName(_sname, splits);
 	//walking the current domain and ancestor domains to look for nameserver domain names we might want to consult, since we dont have an answer yet.
 	for(size_t i = 0; i < splits.size(); i++){
 		
@@ -638,8 +638,8 @@ void solveStandardQuery(shared_ptr<QueryState> query){
 	for(auto safetyIter = safety.begin(); safetyIter < safety.end(); safetyIter++){
 	
 		pair<string, string> safeNs = *safetyIter;
-		query->expandNextServers(safeNs.second);
-		query->expandNextServerAnswer(safeNs.second, safeNs.first);
+		expandNextServers(safeNs.second);
+		expandNextServerAnswer(safeNs.second, safeNs.first);
 	
 	}
 	
@@ -647,9 +647,9 @@ void solveStandardQuery(shared_ptr<QueryState> query){
 	
 		vector<shared_ptr<QueryState> > nextServers;
 	
-		query->_servMutex->lock();
-		sort(query->_nextServers.begin(), query->_nextServers.end(), [](shared_ptr<QueryState> q1, shared_ptr<QueryState> q2){ return q1->_matchScore > q2->_matchScore;} );
-		for(auto iter = query->_nextServers.begin(); iter < query->_nextServers.end(); iter++){
+		_servMutex->lock();
+		sort(_nextServers.begin(), _nextServers.end(), [](shared_ptr<QueryState> q1, shared_ptr<QueryState> q2){ return q1->_matchScore > q2->_matchScore;} );
+		for(auto iter = _nextServers.begin(); iter < _nextServers.end(); iter++){
 			shared_ptr<QueryState> ns = *iter;
 			if(ns->haveLocalOpsLeft() && !ns->_beingUsed){
 				nextServers.push_back(ns);
@@ -657,12 +657,12 @@ void solveStandardQuery(shared_ptr<QueryState> query){
 			}
 			
 		}
-		query->_servMutex->unlock();
+		_servMutex->unlock();
 		for(auto iter = nextServers.begin(); iter < nextServers.end(); iter++){
 			
 			shared_ptr<QueryState> currS = *iter;
 			
-			if(query->haveLocalOpsLeft() && query->haveGlobalOpsLeft()){
+			if(haveLocalOpsLeft() && haveGlobalOpsLeft()){
 				thread workThr(threadFunction, currS, query);
 				workThr.detach();
 			}
