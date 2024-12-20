@@ -73,6 +73,8 @@ class QuestionRecord{
 		void buildString(std::stringstream& s, uint16_t number = 0);
 		void print(uint16_t number = 0);
 		
+		std::string getName();
+		
 	private:
 		std::vector<uint8_t> _name; // a sequence of octets that repeats the pattern: length octet = n, n octets 
 		std::string _realName;
@@ -81,25 +83,32 @@ class QuestionRecord{
 
 };
 
+
 class ResourceRecord{
 
 	public:		
 		//constructor takes c style string(dont include length octets), the length conversion happens in constructor
-		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData);
+		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData, bool auth);
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 				
 		virtual std::string getDataAsString();
 		virtual void affectAnswers(QueryState* q);
 		virtual void affectNameServers(QueryState*  q);
 		
+		std::string getTypeName();
+		
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s, uint16_t number = 0);
 		void print(uint16_t number = 0);
-		void insertRecordIntoCache(std::shared_ptr<ResourceRecord> r, std::time_t time);
 		
+		void insertRecordIntoCache(std::shared_ptr<ResourceRecord> r, std::time_t time);
 		std::shared_ptr<ResourceRecord> GetSpecialResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		bool operator==(ResourceRecord& r);
+		void determineAuthority(std::vector<std::string>& queryNames, bool authMessage);
 		
 	protected:
+		bool _authoritative; // was this record in the answer section from an authoritative message
+		
 		std::vector<uint8_t> _name; // a sequence of octets that repeats the pattern: length octet = n, n octets 
 		std::string _realName;
 		uint16_t _rType;

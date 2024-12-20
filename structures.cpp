@@ -525,8 +525,10 @@ void QuestionRecord::print(uint16_t number){
 
 }
 
+string QuestionRecord::getName(){ return _realName; }
 
-ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, vector<uint8_t> rData): _rType(rType), _rClass(rClass), _ttl(ttl), _rdLength(rdLength){
+
+ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, vector<uint8_t> rData, bool auth): _rType(rType), _rClass(rClass), _ttl(ttl), _rdLength(rdLength), _authoritative(auth){
 
 	_rData = rData;
 	_realName = string(name);
@@ -537,6 +539,8 @@ ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClas
 
 ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
 
+	_authoritative = false;
+	
 	convertBufferNameToVector(start, iter, end, _name, 0);
 	_realName = convertOctetSeqToString(_name);
 	
@@ -577,6 +581,12 @@ string ResourceRecord::getDataAsString(){
 	
 	}
 	return s;
+}
+
+bool ResourceRecord::operator==(ResourceRecord& r){
+
+	return (_realName == r._realName) && (_rType == r._rType) && (getDataAsString() == r.getDataAsString());
+
 }
 
 void ResourceRecord::affectAnswers(QueryState*  q){ return;}
@@ -626,6 +636,7 @@ void ResourceRecord::buildString(std::stringstream& s, uint16_t number){
 	}
 	s << "]" << endl;
 	s << "converted data: " << getDataAsString() << endl;
+	s << "AUTHORITATIVE: " << boolalpha << _authoritative << endl;
 	s << "^^^^^^^^^^^^^^^^^^^^^^^^^END RESOURCERECORD " << number << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
 }
@@ -638,15 +649,69 @@ void ResourceRecord::print(uint16_t number){
 
 }
 
+void ResourceRecord::determineAuthority(std::vector<std::string>& queryNames, bool authMessage){
+
+	if(authMessage){
+	
+		for(auto iter = queryNames.begin(); iter < queryNames.end(); iter++){
+			
+			string checkName = *iter;
+			if(checkName == _realName){
+			
+				_authoritative = true;
+				break;
+			}
+		}
+		
+	}
+	else{
+	
+		_authoritative = false;
+	}
+
+
+
+}
+
+//this and shared_ptr should reference the same object. This makes it easier to access the objects fields but also insert the shared pointer of the object into the cache without copying the underlying object.
 void ResourceRecord::insertRecordIntoCache(shared_ptr<ResourceRecord> r, time_t time){
 
-		
+	ResourceRecord& possR = *r;
+	
 	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
-	if(_ttl > 0){
+	if(possR._ttl > 0){
 		cacheMutex.lock();
-		_cacheExpireTime = time + _ttl;
+		_cacheExpireTime = time + possR._ttl;
 		vector<shared_ptr<ResourceRecord> >& records = cache[_realName];
-		records.push_back(r);
+		
+		bool insert = true;
+		for(auto iter = records.begin(); iter < records.end(); iter++){
+			
+			shared_ptr<ResourceRecord> & currRP = *iter;
+			ResourceRecord& currR = *currRP;
+			
+			//if two records are equal(have same name, type, and data, dont want both to blow up size of cache, so always take the one which expires later
+			//also always share the authoritative mark if either of the records is authoritative. Even though one may have come from a non authoritative server,
+			//if they share the same data they are both authoritative practically.
+			if(currR == possR){
+				vector<string> qName = {possR._realName};
+				
+				if(possR._cacheExpireTime > currR._cacheExpireTime){
+					if(currR._authoritative) possR.determineAuthority(qName, true);
+					records.erase(iter);
+				}
+				else{
+					insert = false;
+					if(possR._authoritative) currR.determineAuthority(qName, true);
+				}
+				
+								
+				break;			
+			}
+		
+		
+		}
+		if(insert) records.push_back(r);
 		cacheMutex.unlock();
 	}
 
@@ -761,9 +826,12 @@ DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::i
 	
 	_hdr = DNSHeader(iter, end, recordSucceeded);
 	
+	vector<string> qNames;
+	
 	for(uint16_t i = 0; (i < _hdr._numQuestions) && recordSucceeded; i++){
 	
 		_question.push_back(QuestionRecord(start,iter,end,recordSucceeded));
+		qNames.push_back(_question.back().getName());
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAnswers) && recordSucceeded; i++){
@@ -771,6 +839,7 @@ DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::i
 		vector<uint8_t>::iterator locIter = iter;
 		ResourceRecord r = ResourceRecord(start, locIter, end, recordSucceeded);
 		_answer.push_back(r.GetSpecialResourceRecord(start,iter,end,recordSucceeded));
+		_answer.back()->determineAuthority(qNames, _hdr._flags._aa);
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAuthRR) && recordSucceeded; i++){
@@ -778,6 +847,7 @@ DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::i
 		vector<uint8_t>::iterator locIter = iter;
 		ResourceRecord r = ResourceRecord(start, locIter, end, recordSucceeded);
 		_authority.push_back(r.GetSpecialResourceRecord(start,iter,end,recordSucceeded));
+		
 	}
 	
 	for(uint16_t i = 0; (i < _hdr._numAdditRR) && recordSucceeded; i++){
@@ -912,21 +982,21 @@ void DNSMessage::cacheRecords(time_t time){
 	for(auto iter = _answer.begin(); iter < _answer.end(); iter++){
 	
 		shared_ptr<ResourceRecord>& r = *iter;
-		r->insertRecordIntoCache(r,time);
+		r->insertRecordIntoCache(r, time);
 	
 	}
 	
 	for(auto iter = _authority.begin(); iter < _authority.end(); iter++){
 	
 		shared_ptr<ResourceRecord>& r = *iter;
-		r->insertRecordIntoCache(r,time);
+		r->insertRecordIntoCache(r, time);
 	
 	}
 	
 	for(auto iter = _additional.begin(); iter < _additional.end(); iter++){
 	
 		shared_ptr<ResourceRecord>& r = *iter;
-		r->insertRecordIntoCache(r,time);
+		r->insertRecordIntoCache(r, time);
 	
 	}
 	
