@@ -89,8 +89,8 @@ class ResourceRecord{
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 				
 		virtual std::string getDataAsString();
-		virtual void affectAnswers(std::shared_ptr<QueryState> q);
-		virtual void affectNameServers(std::shared_ptr<QueryState> q);
+		virtual void affectAnswers(QueryState* q);
+		virtual void affectNameServers(QueryState*  q);
 		
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s, uint16_t number = 0);
@@ -116,8 +116,8 @@ class NSResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
 		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-		void affectAnswers(std::shared_ptr<QueryState> q);
-		void affectNameServers(std::shared_ptr<QueryState> q);
+		void affectAnswers(QueryState*  q);
+		void affectNameServers(QueryState*  q);
 		
 	private:
 		std::string _domain;
@@ -128,8 +128,8 @@ class AResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData();
 		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-		void affectAnswers(std::shared_ptr<QueryState> q);
-		void affectNameServers(std::shared_ptr<QueryState> q);
+		void affectAnswers(QueryState*  q);
+		void affectNameServers(QueryState*  q);
 		
 	private:
 		uint32_t _ip;
@@ -146,7 +146,7 @@ class DNSMessage{
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s);
 		void print();
-		void extractData(std::shared_ptr<QueryState> qr, uint8_t& result, std::time_t time);
+		void extractData(QueryState* qr, uint8_t& result, std::time_t time);
 		void cacheRecords(std::time_t time);
 		bool checkForResponseErrors(uint16_t qId);
 		

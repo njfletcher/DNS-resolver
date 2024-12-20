@@ -173,13 +173,11 @@ vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
 	
 		vector<shared_ptr<ResourceRecord> >& records = cache[domainName];
 		
-		for(auto iter = records.begin(); iter < records.end(); iter++){
-			shared_ptr<ResourceRecord> r = *iter;
-			if(r->_cacheExpireTime < time(NULL)){
-				records.erase(iter);
-			}
-		
-		}
+		//for(auto iter = records.begin(); iter < records.end(); iter++){
+		//	shared_ptr<ResourceRecord> r = *iter;
+		//	r->cleanRecordCache();
+		//
+		//}
 		
 		lr = &records;
 	}
@@ -304,8 +302,8 @@ void QueryState::sendStandardQuery(string nameServerIp){
 	if(networkResult == (int) NetworkErrors::none){
 		auto iter = resp.begin();
 		DNSMessage msg1(iter, iter, resp.end());
-		if(!msg1.checkForResponseErrors(_id){
-			msg1.extractData(state, state->_msgCode, state->_startTime);
+		if(!msg1.checkForResponseErrors(_id)){
+			msg1.extractData(this, _msgCode, _startTime);
 		}
 	
 	}
@@ -419,36 +417,34 @@ void QueryState::setMatchScore(string domainName){
 
 }
 
+vector<string> QueryState::getAnswers(){
 
-void threadFunction(shared_ptr<QueryState> currS,shared_ptr<QueryState> query){
-
-	decrementOps(query);
 	vector<string> answers;
-		
-	currS->_ansMutex->lock();
-	for(auto iter = currS->_answers.begin(); iter < currS->_answers.end(); iter++){
+	_ansMutex->lock();
+	for(auto iter = _answers.begin(); iter < _answers.end(); iter++){
 		answers.push_back(*iter);
-		//printMutex.lock();
-		//cout << "NS answer " << *iter << endl;
-		//printMutex.unlock();
 	}
-	currS->_ansMutex->unlock();
+	_ansMutex->unlock();
+	return answers;
+	
+}
+
+void threadFunction(shared_ptr<QueryState> currS, QueryState* query){
+
+	query->decrementOps();
+	vector<string> answers = currS->getAnswers();
 		
 	if(answers.size() < 1){
-		solveStandardQuery(currS);
+		currS->solveStandardQuery();
 	}
 	else{
 		for(auto iter = answers.begin(); iter < answers.end(); iter++){
 			string ans = *iter;
-			decrementOps(currS);
-			
-			//printMutex.lock();
-			//cout << "sending request to " << currS->_sname << "(" << ans << ") to solve " << query->_sname << endl;
-			//printMutex.unlock();
+			currS->decrementOps();
 			query->sendStandardQuery(ans);
 			
 		}	
-		currS->_numOpsLocalLeft = 0;
+		//currS->_numOpsLocalLeft = 0;
 				
 	}
 					
@@ -465,7 +461,7 @@ void QueryState::solveStandardQuery(){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
 			shared_ptr<ResourceRecord> r = *iter;
-			r->affectAnswers(query);
+			r->affectAnswers(this);
 		
 		}
 	}
@@ -503,7 +499,7 @@ void QueryState::solveStandardQuery(){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
 				shared_ptr<ResourceRecord> r = *iter;
-				r->affectNameServers(query);
+				r->affectNameServers(this);
 			}
 		}
 		cacheMutex.unlock();
@@ -539,14 +535,14 @@ void QueryState::solveStandardQuery(){
 			shared_ptr<QueryState> currS = *iter;
 			
 			if(haveLocalOpsLeft() && haveGlobalOpsLeft()){
-				thread workThr(threadFunction, currS, query);
+				thread workThr(threadFunction, currS, this);
 				workThr.detach();
 			}
 				
 			
 		}
 		
-		if(checkEndCondition(*query)) break;
+		if(checkEndCondition()) break;
 			
 	}
 	

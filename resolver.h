@@ -97,12 +97,13 @@ class QueryState{
 		void expandAnswers(std::string answer);
 		void expandNextServerAnswer(std::string server, std::string answer);
 		void expandNextServers(std::string server);
+		std::vector<std::string> getAnswers();
 						
 		void setMatchScore(std::string domainName);
 		void solveStandardQuery();
 		
 		bool checkEndCondition();
-		bool displayResult();
+		void displayResult();
 		bool haveLocalOpsLeft();
 		bool haveGlobalOpsLeft();
 		void decrementOps();
@@ -155,9 +156,7 @@ class QueryState{
 };
 
 void loadSafeties(std::string filePath);
-void solveStandardQuery(std::shared_ptr<QueryState> query);
 void dumpCacheToFile();
-void displayResult(QueryState& q);
 
 
 

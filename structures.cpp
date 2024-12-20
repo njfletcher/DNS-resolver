@@ -579,8 +579,8 @@ string ResourceRecord::getDataAsString(){
 	return s;
 }
 
-void ResourceRecord::affectAnswers(shared_ptr<QueryState> q){ return;}
-void ResourceRecord::affectNameServers(shared_ptr<QueryState> q){ return; }
+void ResourceRecord::affectAnswers(QueryState*  q){ return;}
+void ResourceRecord::affectNameServers(QueryState*  q){ return; }
 
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
@@ -667,8 +667,8 @@ string NSResourceRecord::getDataAsString(){
 	return _domain;
 }
 
-void NSResourceRecord::affectAnswers(shared_ptr<QueryState> q){ return; }
-void NSResourceRecord::affectNameServers(shared_ptr<QueryState> q){
+void NSResourceRecord::affectAnswers(QueryState*  q){ return; }
+void NSResourceRecord::affectNameServers(QueryState*  q){
 
 	q->expandNextServers(getDataAsString());
 }
@@ -709,12 +709,12 @@ string AResourceRecord::getDataAsString(){
 	return convertIpIntToString(_ip);
 }
 
-void AResourceRecord::affectAnswers(shared_ptr<QueryState> q){ 
+void AResourceRecord::affectAnswers(QueryState*  q){ 
 
 	q->expandAnswers(getDataAsString());
 
 }
-void AResourceRecord::affectNameServers(shared_ptr<QueryState> q){
+void AResourceRecord::affectNameServers(QueryState*  q){
 			
 	q->expandNextServerAnswer(_realName, getDataAsString());
 	
@@ -751,7 +751,6 @@ shared_ptr<ResourceRecord> ResourceRecord::GetSpecialResourceRecord(const vector
 	
 	}
 }
-
 
 DNSMessage::DNSMessage(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end){
 
@@ -867,7 +866,7 @@ void DNSMessage::print(){
 	
 }
 
-void DNSMessage::extractData(shared_ptr<QueryState> qr, uint8_t& result, std::time_t time){
+void DNSMessage::extractData(QueryState* qr, uint8_t& result, std::time_t time){
 
 	result = _hdr._flags._rcode;
 	
