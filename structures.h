@@ -101,7 +101,9 @@ class ResourceRecord{
 		void buildString(std::stringstream& s, uint16_t number = 0);
 		void print(uint16_t number = 0);
 		
-		void insertRecordIntoCache(std::shared_ptr<ResourceRecord> r, std::time_t time);
+		static std::vector<std::shared_ptr<ResourceRecord> >* getRecordsFromCache(std::string domainName);
+		static void insertRecordIntoCache(std::shared_ptr<ResourceRecord> r, std::time_t time);
+		
 		std::shared_ptr<ResourceRecord> GetSpecialResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 		bool operator==(ResourceRecord& r);
 		void determineAuthority(std::vector<std::string>& queryNames, bool authMessage);

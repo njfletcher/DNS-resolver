@@ -636,6 +636,7 @@ void ResourceRecord::buildString(std::stringstream& s, uint16_t number){
 	}
 	s << "]" << endl;
 	s << "converted data: " << getDataAsString() << endl;
+	s << "cache expire " << asctime(localtime(&_cacheExpireTime)) << endl;
 	s << "AUTHORITATIVE: " << boolalpha << _authoritative << endl;
 	s << "^^^^^^^^^^^^^^^^^^^^^^^^^END RESOURCERECORD " << number << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 
@@ -673,7 +674,6 @@ void ResourceRecord::determineAuthority(std::vector<std::string>& queryNames, bo
 
 }
 
-//this and shared_ptr should reference the same object. This makes it easier to access the objects fields but also insert the shared pointer of the object into the cache without copying the underlying object.
 void ResourceRecord::insertRecordIntoCache(shared_ptr<ResourceRecord> r, time_t time){
 
 	ResourceRecord& possR = *r;
@@ -681,8 +681,8 @@ void ResourceRecord::insertRecordIntoCache(shared_ptr<ResourceRecord> r, time_t 
 	//if a ttl of 0, shouldnt cache it globally. This record will be cached locally for the query in the DNSMessage itself.
 	if(possR._ttl > 0){
 		cacheMutex.lock();
-		_cacheExpireTime = time + possR._ttl;
-		vector<shared_ptr<ResourceRecord> >& records = cache[_realName];
+		possR._cacheExpireTime = time + possR._ttl;
+		vector<shared_ptr<ResourceRecord> >& records = cache[possR._realName];
 		
 		bool insert = true;
 		for(auto iter = records.begin(); iter < records.end(); iter++){
@@ -714,6 +714,30 @@ void ResourceRecord::insertRecordIntoCache(shared_ptr<ResourceRecord> r, time_t 
 		if(insert) records.push_back(r);
 		cacheMutex.unlock();
 	}
+
+}
+
+//this method does not have mutex locking in it. the calling context is expected to lock instead in order to use the returned vector of records safely
+vector<shared_ptr<ResourceRecord> >* ResourceRecord::getRecordsFromCache(string domainName){
+
+	vector<shared_ptr<ResourceRecord> >* lr = NULL;
+	
+	if(cache.find(domainName) != cache.end()){
+	
+		vector<shared_ptr<ResourceRecord> >& records = cache[domainName];
+		
+		for(auto iter = records.begin(); iter < records.end();){
+			shared_ptr<ResourceRecord>& r = *iter;
+			if(r->_cacheExpireTime > time(NULL)){
+				iter = records.erase(iter);
+			}
+			else iter++;
+		}
+		
+		lr = &records;
+	}
+	return lr;
+	
 
 }
 

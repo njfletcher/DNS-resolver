@@ -164,29 +164,6 @@ void loadSafeties(string filePath){
 }
 
 
-//this method does not have mutex locking in it. the calling context is expected to lock instead in order to use the returned vector of records safely
-vector<shared_ptr<ResourceRecord> >* getRecordsFromCache(string domainName){
-
-	vector<shared_ptr<ResourceRecord> >* lr = NULL;
-	
-	if(cache.find(domainName) != cache.end()){
-	
-		vector<shared_ptr<ResourceRecord> >& records = cache[domainName];
-		
-		//for(auto iter = records.begin(); iter < records.end(); iter++){
-		//	shared_ptr<ResourceRecord> r = *iter;
-		//	r->cleanRecordCache();
-		//
-		//}
-		
-		lr = &records;
-	}
-	return lr;
-	
-
-}
-
-
 void QueryState::expandAnswers(string answer){
 		
 	_ansMutex->lock();
@@ -456,7 +433,7 @@ void QueryState::solveStandardQuery(){
 
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex.lock();
-	vector<shared_ptr<ResourceRecord> >* directCached = getRecordsFromCache(_sname);
+	vector<shared_ptr<ResourceRecord> >* directCached = ResourceRecord::getRecordsFromCache(_sname);
 	if(directCached != NULL){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
@@ -494,7 +471,7 @@ void QueryState::solveStandardQuery(){
 		}
 		
 		cacheMutex.lock();
-		vector<shared_ptr<ResourceRecord> >* indirectCached = getRecordsFromCache(currDomain);
+		vector<shared_ptr<ResourceRecord> >* indirectCached = ResourceRecord::getRecordsFromCache(currDomain);
 		if(indirectCached != NULL){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
