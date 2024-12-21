@@ -16,8 +16,8 @@
 
 //operation capping to make sure threads dont go out of control or network errors cause program to run forever.
 //a thread spawn or network request is one operation decrement
-#define perQueryOpCap 100
-#define perSequenceOpCap 2000
+#define perQueryOpCap 50
+#define perSequenceOpCap 1000
 
 class DNSMessage;
 class ResourceRecord;
@@ -90,6 +90,9 @@ enum class ResponseCodes{
 class QueryState{
 
 	public:		
+		//name queried
+		std::string _sname;
+		
 		~QueryState();
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState* q);
@@ -118,8 +121,7 @@ class QueryState{
 		//id of the original query
 		uint16_t _id;
 		
-		//name queried
-		std::string _sname;
+		
 		
 		//qtype of request
 		uint16_t _stype;

@@ -30,9 +30,10 @@ mutex printMutex;
 
 void dumpCacheToFile(){
 
+	cacheMutex.lock();
+	
 	ofstream ot("cacheDump.txt");
 	
-	cacheMutex.lock();
 	for(auto iter = cache.begin(); iter != cache.end(); iter++){
 		
 		vector<shared_ptr<ResourceRecord> >& lr = iter->second;
@@ -430,6 +431,10 @@ void threadFunction(shared_ptr<QueryState> currS, QueryState* query){
 		for(auto iter = answers.begin(); iter < answers.end(); iter++){
 			string ans = *iter;
 			currS->decrementOps();
+			
+			//printMutex.lock();
+			//cout << "sending request to " << currS->_sname << "(" << ans << ") to resolve " << query->_sname << endl;
+			//printMutex.unlock();
 			query->sendStandardQuery(ans);
 			
 		}	
@@ -441,6 +446,10 @@ void threadFunction(shared_ptr<QueryState> currS, QueryState* query){
 
 void QueryState::solveStandardQuery(){
 
+	//printMutex.lock();
+	//cout << "started resolving " << _sname << endl;
+	//printMutex.unlock();
+	
 	_beingUsed = true;
 
 	//check cache directly for answers for this query. If we find any, we are done.
@@ -531,9 +540,12 @@ void QueryState::solveStandardQuery(){
 			
 		}
 		
+		dumpCacheToFile();
 		if(checkEndCondition()) break;
 			
 	}
+	
+	_beingUsed = false;
 	
 }
 
