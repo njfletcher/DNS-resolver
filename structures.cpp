@@ -960,9 +960,7 @@ void DNSMessage::print(){
 	
 }
 
-void DNSMessage::extractData(QueryState* qr, uint8_t& result, std::time_t time){
-
-	result = _hdr._flags._rcode;
+void DNSMessage::extractData(QueryState* qr, std::time_t time){
 	
 	cacheRecords(time);
 	
@@ -1027,16 +1025,17 @@ void DNSMessage::cacheRecords(time_t time){
 
 }
 
-bool DNSMessage::checkForResponseErrors(uint16_t qId){
+bool DNSMessage::checkForResponseErrors(uint16_t qId, uint8_t& code){
 
+	code = _hdr._flags._rcode;
+	
 	if(_hdr._flags._qr != (uint8_t) qrVals::response){
 	
 		return true;
 	
 	}
 	
-	uint8_t respCode = _hdr._flags._rcode;
-	if(respCode != (uint8_t) ResponseCodes::none){
+	if(code != (uint8_t) ResponseCodes::none){
 	
 		return true;
 	

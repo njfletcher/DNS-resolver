@@ -147,7 +147,6 @@ class AResourceRecord: public ResourceRecord {
 };
 
 
-
 class DNSMessage{
 
 	public:
@@ -157,9 +156,9 @@ class DNSMessage{
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s);
 		void print();
-		void extractData(QueryState* qr, uint8_t& result, std::time_t time);
+		void extractData(QueryState* qr, std::time_t time);
 		void cacheRecords(std::time_t time);
-		bool checkForResponseErrors(uint16_t qId);
+		bool checkForResponseErrors(uint16_t qId, uint8_t& code);
 		
 	private:
 		DNSHeader _hdr;

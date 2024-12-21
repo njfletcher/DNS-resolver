@@ -16,8 +16,8 @@
 
 //operation capping to make sure threads dont go out of control or network errors cause program to run forever.
 //a thread spawn or network request is one operation decrement
-#define perQueryOpCap 20
-#define perSequenceOpCap 100
+#define perQueryOpCap 100
+#define perSequenceOpCap 2000
 
 class DNSMessage;
 class ResourceRecord;
@@ -107,6 +107,7 @@ class QueryState{
 		bool haveLocalOpsLeft();
 		bool haveGlobalOpsLeft();
 		void decrementOps();
+		void forceEndQuery(bool localOnly);
 		void sendStandardQuery(std::string nameServerIp);
 		
 	private:
@@ -145,13 +146,15 @@ class QueryState{
 		//0 means termination. This could be from exhausting ops, finding answers, or fatal errors.
 		unsigned int _numOpsLocalLeft;
 		
+		//number of operations left for the series of requests that led to this one until failure
+		//0 means sequence has terminated. Same reasons as above.
+		std::shared_ptr<unsigned int> _numOpsGlobalLeft;
+		
 		std::shared_ptr<std::mutex> _opMutex;
 		std::shared_ptr<std::mutex> _servMutex;
 		std::shared_ptr<std::mutex> _ansMutex;
 		
-		//number of operations left for the series of requests that led to this one until failure
-		//0 means sequence has terminated. Same reasons as above.
-		std::shared_ptr<unsigned int> _numOpsGlobalLeft;
+		
 		
 };
 

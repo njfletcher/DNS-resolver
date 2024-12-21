@@ -246,6 +246,18 @@ bool QueryState::haveLocalOpsLeft(){
 	return (_numOpsLocalLeft >= 1);
 }
 
+void QueryState::forceEndQuery(bool localOnly){
+
+	_numOpsLocalLeft = 0;
+
+	if(!localOnly){
+		_opMutex->lock();
+		*_numOpsGlobalLeft = 0;
+		_opMutex->unlock();
+	}
+
+}
+
 bool QueryState::haveGlobalOpsLeft(){
 
 	_opMutex->lock();
@@ -279,8 +291,8 @@ void QueryState::sendStandardQuery(string nameServerIp){
 	if(networkResult == (int) NetworkErrors::none){
 		auto iter = resp.begin();
 		DNSMessage msg1(iter, iter, resp.end());
-		if(!msg1.checkForResponseErrors(_id)){
-			msg1.extractData(this, _msgCode, _startTime);
+		if(!msg1.checkForResponseErrors(_id, _msgCode)){
+			msg1.extractData(this, _startTime);
 		}
 	
 	}
@@ -421,7 +433,7 @@ void threadFunction(shared_ptr<QueryState> currS, QueryState* query){
 			query->sendStandardQuery(ans);
 			
 		}	
-		//currS->_numOpsLocalLeft = 0;
+		currS->forceEndQuery(true);
 				
 	}
 					
