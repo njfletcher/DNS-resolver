@@ -29,6 +29,8 @@ extern std::mutex printMutex;
 extern std::vector<std::thread> threads;
 extern std::mutex threadMutex;
 
+extern std::atomic<bool> moreThreads;
+
 
 
 enum class qrVals{

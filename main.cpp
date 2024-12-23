@@ -31,16 +31,33 @@ int main(int argc, char** argv){
 	q->displayResult();
 	
 	
-	threadMutex.lock();
-	printMutex.lock();
-	cout << threads.size() << endl;
-	printMutex.unlock();
-	for(auto iter = threads.begin(); iter < threads.end(); iter++){
-		iter->join();
+	moreThreads.store(false);
 	
+	while(true){
+	
+		threadMutex.lock();
+		if(threads.size() < 1){
+			threadMutex.unlock();
+			break;
+		}
+		else{
+			thread& t = threads.back();
+			if(t.joinable()){
+				threadMutex.unlock();
+				t.join();
+			}
+			else{
+				threadMutex.unlock();
+				threads.pop_back();
+			
+			}
+			
+		
+		}
+	
+
 	}
-	threadMutex.unlock();
-	
+		
 	return 0;
 
 

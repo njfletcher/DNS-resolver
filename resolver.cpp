@@ -31,6 +31,8 @@ mutex printMutex;
 vector<thread> threads;
 mutex threadMutex;
 
+atomic<bool> moreThreads(true);
+
 void dumpCacheToFile(){
 
 	ofstream ot("cacheDump.txt");
@@ -536,7 +538,7 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 			
 			shared_ptr<QueryState> currS = *iter;
 			
-			if(q->haveLocalOpsLeft() && q->haveGlobalOpsLeft()){
+			if(q->haveLocalOpsLeft() && q->haveGlobalOpsLeft() && moreThreads.load()){
 				threadMutex.lock();
 				threads.emplace_back(threadFunction, currS, q);
 				threadMutex.unlock();
@@ -547,6 +549,7 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 		
 		//dumpCacheToFile();
 		if(q->checkEndCondition()) break;
+		if(!moreThreads.load()) break;
 			
 	}
 	
