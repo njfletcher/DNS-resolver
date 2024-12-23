@@ -26,6 +26,9 @@ extern std::mutex cacheMutex;
 extern std::unordered_map<std::string, std::vector< std::shared_ptr<ResourceRecord> > > cache;
 extern std::mutex printMutex;
 
+extern std::vector<std::thread> threads;
+extern std::mutex threadMutex;
+
 
 
 enum class qrVals{
@@ -90,8 +93,6 @@ enum class ResponseCodes{
 class QueryState{
 
 	public:		
-		//name queried
-		std::string _sname;
 		
 		~QueryState();
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
@@ -103,7 +104,8 @@ class QueryState{
 		std::vector<std::string> getAnswers();
 						
 		void setMatchScore(std::string domainName);
-		void solveStandardQuery();
+		static void solveStandardQuery(std::shared_ptr<QueryState> q);
+		static void sendStandardQuery(std::shared_ptr<QueryState> q, std::string nameServerIp);
 		
 		bool checkEndCondition();
 		void displayResult();
@@ -111,17 +113,18 @@ class QueryState{
 		bool haveGlobalOpsLeft();
 		void decrementOps();
 		void forceEndQuery(bool localOnly);
-		void sendStandardQuery(std::string nameServerIp);
+		
 		
 	private:
 	
+		//name queried
+		std::string _sname;
+	
 		//true if this query state is currently being answered by some thread. this avoids double resolving
-		bool _beingUsed;
+		std::atomic<bool> _beingUsed;
 	
 		//id of the original query
 		uint16_t _id;
-		
-		
 		
 		//qtype of request
 		uint16_t _stype;

@@ -24,11 +24,22 @@ int main(int argc, char** argv){
 
 	
 	shared_ptr<QueryState> q = make_shared<QueryState>(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
-	q->solveStandardQuery();
+	QueryState::solveStandardQuery(q);
 	
-	dumpCacheToFile();
+	//dumpCacheToFile();
 	
 	q->displayResult();
+	
+	
+	threadMutex.lock();
+	printMutex.lock();
+	cout << threads.size() << endl;
+	printMutex.unlock();
+	for(auto iter = threads.begin(); iter < threads.end(); iter++){
+		iter->join();
+	
+	}
+	threadMutex.unlock();
 	
 	return 0;
 

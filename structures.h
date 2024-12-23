@@ -92,8 +92,8 @@ class ResourceRecord{
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 				
 		virtual std::string getDataAsString();
-		virtual void affectAnswers(QueryState* q);
-		virtual void affectNameServers(QueryState*  q);
+		virtual void affectAnswers(std::shared_ptr<QueryState> q);
+		virtual void affectNameServers(std::shared_ptr<QueryState>  q);
 		
 		std::string getTypeName();
 		
@@ -127,8 +127,8 @@ class NSResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
 		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-		void affectAnswers(QueryState*  q);
-		void affectNameServers(QueryState*  q);
+		void affectAnswers(std::shared_ptr<QueryState>  q);
+		void affectNameServers(std::shared_ptr<QueryState>  q);
 		
 	private:
 		std::string _domain;
@@ -139,8 +139,8 @@ class AResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData();
 		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
-		void affectAnswers(QueryState*  q);
-		void affectNameServers(QueryState*  q);
+		void affectAnswers(std::shared_ptr<QueryState> q);
+		void affectNameServers(std::shared_ptr<QueryState>  q);
 		
 	private:
 		uint32_t _ip;
@@ -156,7 +156,7 @@ class DNSMessage{
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s);
 		void print();
-		void extractData(QueryState* qr, std::time_t time);
+		void extractData(std::shared_ptr<QueryState> qr, std::time_t time);
 		void cacheRecords(std::time_t time);
 		bool checkForResponseErrors(uint16_t qId, uint8_t& code);
 		

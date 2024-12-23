@@ -28,11 +28,14 @@ unordered_map<string, vector< shared_ptr<ResourceRecord> > > cache;
 
 mutex printMutex;
 
+vector<thread> threads;
+mutex threadMutex;
+
 void dumpCacheToFile(){
 
-	cacheMutex.lock();
-	
 	ofstream ot("cacheDump.txt");
+	
+	cacheMutex.lock();
 	
 	for(auto iter = cache.begin(); iter != cache.end(); iter++){
 		
@@ -97,7 +100,7 @@ QueryState::~QueryState(){
 QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sname), _stype(stype), _sclass(sclass){ 
 
 
-	_beingUsed = false;
+	_beingUsed.store(false);
 	_id = pickNextId();
 	_matchScore = 0;
 	
@@ -125,7 +128,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState
 	
 	 _numOpsGlobalLeft = q->_numOpsGlobalLeft;
 	
-	_beingUsed = false;
+	_beingUsed.store(false);
 	_networkCode = (int) NetworkErrors::none;
 	_msgCode = (uint8_t) ResponseCodes::none;
 	_startTime = time(NULL);
@@ -268,11 +271,11 @@ bool QueryState::haveGlobalOpsLeft(){
 }
 
 
-void QueryState::sendStandardQuery(string nameServerIp){
+void QueryState::sendStandardQuery(shared_ptr<QueryState> query, string nameServerIp){
 
 	DNSFlags flg((uint8_t)qrVals::query, (uint8_t) opcodes::standard, 0, 0, 0, 0, 0, 0);
-	DNSHeader hdr(_id, flg, 1, 0, 0,0);
-	QuestionRecord q(_sname.c_str(), _stype , _sclass);
+	DNSHeader hdr(query->_id, flg, 1, 0, 0,0);
+	QuestionRecord q(query->_sname.c_str(), query->_stype , query->_sclass);
 	
 	vector<QuestionRecord> qr;
 	qr.push_back(q);
@@ -287,20 +290,20 @@ void QueryState::sendStandardQuery(string nameServerIp){
 
 	int networkResult = sendMessageResolverClient(nameServerIp, buff, resp);
 	
-	_networkCode = networkResult;
+	query->_networkCode = networkResult;
 	
 	if(networkResult == (int) NetworkErrors::none){
 		auto iter = resp.begin();
 		DNSMessage msg1(iter, iter, resp.end());
-		if(!msg1.checkForResponseErrors(_id, _msgCode)){
-			msg1.extractData(this, _startTime);
+		if(!msg1.checkForResponseErrors(query->_id, query->_msgCode)){
+			msg1.extractData(query, query->_startTime);
 		}
 	
 	}
 	
 }
 
-void splitDomainName(string domainName, vector<string>& splits){
+void splitDomainName(string domainName, vector<string>& splits, bool rev){
 	
 	
 	bool labelsLeft = true;
@@ -322,6 +325,7 @@ void splitDomainName(string domainName, vector<string>& splits){
 	
 	//needs one last split for the root
 	splits.push_back("");
+	if(rev) reverse(splits.begin(), splits.end());
 
 
 }
@@ -381,17 +385,17 @@ void QueryState::displayResult(){
 void QueryState::setMatchScore(string domainName){
 
 	vector<string> refSplits;
-	splitDomainName(domainName, refSplits);
+	splitDomainName(domainName, refSplits, true);
 	
 	vector<string> ownSplits;
-	splitDomainName(_sname, ownSplits);
+	splitDomainName(_sname, ownSplits, true);
 	
 	int score = 0;
 	
 	size_t refLen = refSplits.size();
 	size_t ownLen = ownSplits.size();
 	
-	for(size_t i = refLen -1, j = ownLen -1; i >= 0 && j >=0; i--, j--){
+	for(size_t i = 0, j = 0; i < refLen && j < ownLen; i++, j++){
 
 		if(refSplits[i] == ownSplits[j]){
 			score++;
@@ -419,13 +423,13 @@ vector<string> QueryState::getAnswers(){
 	
 }
 
-void threadFunction(shared_ptr<QueryState> currS, QueryState* query){
+void threadFunction(shared_ptr<QueryState> currS, shared_ptr<QueryState> query){
 
 	query->decrementOps();
 	vector<string> answers = currS->getAnswers();
 		
 	if(answers.size() < 1){
-		currS->solveStandardQuery();
+		QueryState::solveStandardQuery(currS);
 	}
 	else{
 		for(auto iter = answers.begin(); iter < answers.end(); iter++){
@@ -435,7 +439,7 @@ void threadFunction(shared_ptr<QueryState> currS, QueryState* query){
 			//printMutex.lock();
 			//cout << "sending request to " << currS->_sname << "(" << ans << ") to resolve " << query->_sname << endl;
 			//printMutex.unlock();
-			query->sendStandardQuery(ans);
+			QueryState::sendStandardQuery(query, ans);
 			
 		}	
 		currS->forceEndQuery(true);
@@ -444,38 +448,38 @@ void threadFunction(shared_ptr<QueryState> currS, QueryState* query){
 					
 }
 
-void QueryState::solveStandardQuery(){
+void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 
 	//printMutex.lock();
 	//cout << "started resolving " << _sname << endl;
 	//printMutex.unlock();
 	
-	_beingUsed = true;
+	q->_beingUsed.store(true);
 
 	//check cache directly for answers for this query. If we find any, we are done.
 	cacheMutex.lock();
-	vector<shared_ptr<ResourceRecord> >* directCached = ResourceRecord::getRecordsFromCache(_sname);
+	vector<shared_ptr<ResourceRecord> >* directCached = ResourceRecord::getRecordsFromCache(q->_sname);
 	if(directCached != NULL){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
 			shared_ptr<ResourceRecord> r = *iter;
-			r->affectAnswers(this);
+			r->affectAnswers(q);
 		
 		}
 	}
 	cacheMutex.unlock();
 	
-	_ansMutex->lock();
-	size_t ansSize = _answers.size();
-	_ansMutex->unlock();
+	q->_ansMutex->lock();
+	size_t ansSize = q->_answers.size();
+	q->_ansMutex->unlock();
 	
 	if(ansSize > 0){
-		_beingUsed = false; 
+		q->_beingUsed.store(false); 
 		return; 
 	}
 	
 	vector<string> splits;
-	splitDomainName(_sname, splits);
+	splitDomainName(q->_sname, splits, false);
 	//walking the current domain and ancestor domains to look for nameserver domain names we might want to consult, since we dont have an answer yet.
 	for(size_t i = 0; i < splits.size(); i++){
 		
@@ -497,7 +501,7 @@ void QueryState::solveStandardQuery(){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
 				shared_ptr<ResourceRecord> r = *iter;
-				r->affectNameServers(this);
+				r->affectNameServers(q);
 			}
 		}
 		cacheMutex.unlock();
@@ -508,8 +512,8 @@ void QueryState::solveStandardQuery(){
 	for(auto safetyIter = safety.begin(); safetyIter < safety.end(); safetyIter++){
 	
 		pair<string, string> safeNs = *safetyIter;
-		expandNextServers(safeNs.second);
-		expandNextServerAnswer(safeNs.second, safeNs.first);
+		q->expandNextServers(safeNs.second);
+		q->expandNextServerAnswer(safeNs.second, safeNs.first);
 	
 	}
 	
@@ -517,35 +521,36 @@ void QueryState::solveStandardQuery(){
 	
 		vector<shared_ptr<QueryState> > nextServers;
 	
-		_servMutex->lock();
-		sort(_nextServers.begin(), _nextServers.end(), [](shared_ptr<QueryState> q1, shared_ptr<QueryState> q2){ return q1->_matchScore > q2->_matchScore;} );
-		for(auto iter = _nextServers.begin(); iter < _nextServers.end(); iter++){
+		q->_servMutex->lock();
+		sort(q->_nextServers.begin(), q->_nextServers.end(), [](shared_ptr<QueryState> q1, shared_ptr<QueryState> q2){ return q1->_matchScore > q2->_matchScore;} );
+		for(auto iter = q->_nextServers.begin(); iter < q->_nextServers.end(); iter++){
 			shared_ptr<QueryState> ns = *iter;
-			if(ns->haveLocalOpsLeft() && !ns->_beingUsed){
+			if(ns->haveLocalOpsLeft() && !ns->_beingUsed.load()){
 				nextServers.push_back(ns);
-				ns->_beingUsed = true;
+				ns->_beingUsed.store(true);
 			}
 			
 		}
-		_servMutex->unlock();
+		q->_servMutex->unlock();
 		for(auto iter = nextServers.begin(); iter < nextServers.end(); iter++){
 			
 			shared_ptr<QueryState> currS = *iter;
 			
-			if(haveLocalOpsLeft() && haveGlobalOpsLeft()){
-				thread workThr(threadFunction, currS, this);
-				workThr.detach();
+			if(q->haveLocalOpsLeft() && q->haveGlobalOpsLeft()){
+				threadMutex.lock();
+				threads.emplace_back(threadFunction, currS, q);
+				threadMutex.unlock();
 			}
 				
 			
 		}
 		
-		dumpCacheToFile();
-		if(checkEndCondition()) break;
+		//dumpCacheToFile();
+		if(q->checkEndCondition()) break;
 			
 	}
 	
-	_beingUsed = false;
+	q->_beingUsed.store(false);
 	
 }
 

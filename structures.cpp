@@ -589,8 +589,8 @@ bool ResourceRecord::operator==(ResourceRecord& r){
 
 }
 
-void ResourceRecord::affectAnswers(QueryState*  q){ return;}
-void ResourceRecord::affectNameServers(QueryState*  q){ return; }
+void ResourceRecord::affectAnswers(shared_ptr<QueryState> q){ return;}
+void ResourceRecord::affectNameServers(shared_ptr<QueryState>  q){ return; }
 
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
@@ -682,7 +682,8 @@ void ResourceRecord::insertRecordIntoCache(shared_ptr<ResourceRecord> r, time_t 
 	if(possR._ttl > 0){
 		cacheMutex.lock();
 		possR._cacheExpireTime = time + possR._ttl;
-		vector<shared_ptr<ResourceRecord> >& records = cache[possR._realName];
+		string nm = possR._realName;
+		vector<shared_ptr<ResourceRecord> >& records = cache[nm];
 		
 		bool insert = true;
 		for(auto iter = records.begin(); iter < records.end(); iter++){
@@ -756,8 +757,8 @@ string NSResourceRecord::getDataAsString(){
 	return _domain;
 }
 
-void NSResourceRecord::affectAnswers(QueryState*  q){ return; }
-void NSResourceRecord::affectNameServers(QueryState*  q){
+void NSResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ return; }
+void NSResourceRecord::affectNameServers(shared_ptr<QueryState>  q){
 
 	q->expandNextServers(getDataAsString());
 }
@@ -798,12 +799,12 @@ string AResourceRecord::getDataAsString(){
 	return convertIpIntToString(_ip);
 }
 
-void AResourceRecord::affectAnswers(QueryState*  q){ 
+void AResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ 
 
 	q->expandAnswers(getDataAsString());
 
 }
-void AResourceRecord::affectNameServers(QueryState*  q){
+void AResourceRecord::affectNameServers(shared_ptr<QueryState>  q){
 			
 	q->expandNextServerAnswer(_realName, getDataAsString());
 	
@@ -960,7 +961,7 @@ void DNSMessage::print(){
 	
 }
 
-void DNSMessage::extractData(QueryState* qr, std::time_t time){
+void DNSMessage::extractData(shared_ptr<QueryState> qr, std::time_t time){
 	
 	cacheRecords(time);
 	
