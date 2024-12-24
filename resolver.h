@@ -100,14 +100,15 @@ class QueryState{
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState* q);
 		
-		void expandAnswers(std::string answer);
-		void expandNextServerAnswer(std::string server, std::string answer);
+		void expandAnswers(ResourceRecord answer);
+		void expandNextServerAnswer(std::string server, ResourceRecord answer);
 		void expandNextServers(std::string server);
-		std::vector<std::string> getAnswers();
+		void expandIps(std::string ip);
 						
 		void setMatchScore(std::string domainName);
 		static void solveStandardQuery(std::shared_ptr<QueryState> q);
 		static void sendStandardQuery(std::shared_ptr<QueryState> q, std::string nameServerIp);
+		static void threadFunction(std::shared_ptr<QueryState> currS, std::shared_ptr<QueryState> query);
 		
 		bool checkEndCondition();
 		void displayResult();
@@ -144,7 +145,15 @@ class QueryState{
 		std::time_t _startTime;
 		
 		//answers received for this query
-		std::vector<std::string> _answers;
+		std::vector<ResourceRecord> _answers;
+		
+		//extra information that does not directly answer the query, but needs to be displayed to the user
+		//Example: User makes an A query. Program encounters cname redirect along the way. This cname is not a real answer(A record), but it is still something the user should be aware of.
+		std::vector<ResourceRecord> _extraInfo;
+		
+		//known ips for the server being queried
+		std::vector<std::string> _ips;
+		
 		
 		int _networkCode;
 		uint8_t _msgCode;
@@ -159,6 +168,7 @@ class QueryState{
 		
 		std::shared_ptr<std::mutex> _servMutex;
 		std::shared_ptr<std::mutex> _ansMutex;
+		std::shared_ptr<std::mutex> _infoMutex;
 		
 		
 		

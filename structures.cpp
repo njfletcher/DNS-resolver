@@ -533,6 +533,9 @@ ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClas
 	_rData = rData;
 	_realName = string(name);
 	convertCStringToOctetForm(name, _name);
+	_addToAnswers = false;
+	_addToServers = false;
+	_addToIps = false;
 
 }
 
@@ -569,6 +572,10 @@ ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uin
 		iter = iter + 1;
 	}
 	
+	_addToAnswers = false;
+	_addToServers = false;
+	_addToIps = false;
+	
 	
 }
 
@@ -588,9 +595,6 @@ bool ResourceRecord::operator==(ResourceRecord& r){
 	return (_realName == r._realName) && (_rType == r._rType) && (getDataAsString() == r.getDataAsString());
 
 }
-
-void ResourceRecord::affectAnswers(shared_ptr<QueryState> q){ return;}
-void ResourceRecord::affectNameServers(shared_ptr<QueryState>  q){ return; }
 
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
@@ -1000,6 +1004,9 @@ bool DNSMessage::checkForResponseErrors(uint16_t qId, uint8_t& code){
 
 AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end,succeeded) {
 	convertRData();
+	_addToAnswers = true;
+	_addToServers = false;
+	_addToIps = true;
 }
 
 void AResourceRecord::convertRData(){
@@ -1020,19 +1027,11 @@ string AResourceRecord::getDataAsString(){
 	return convertIpIntToString(_ip);
 }
 
-void AResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ 
-
-	q->expandAnswers(getDataAsString());
-
-}
-void AResourceRecord::affectNameServers(shared_ptr<QueryState>  q){
-			
-	q->expandNextServerAnswer(_realName, getDataAsString());
-	
-}
-
 NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
 	convertRData(start, end);
+	_addToAnswers = false;
+	_addToServers = true;
+	_addToIps = false;
 }
 
 void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
@@ -1043,12 +1042,6 @@ void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<u
 
 string NSResourceRecord::getDataAsString(){
 	return _domain;
-}
-
-void NSResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ return; }
-void NSResourceRecord::affectNameServers(shared_ptr<QueryState>  q){
-
-	q->expandNextServers(getDataAsString());
 }
 
 CNameResourceRecord::CNameResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
@@ -1065,8 +1058,6 @@ string CNameResourceRecord::getDataAsString(){
 	return _domain;
 }
 
-void CNameResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ return; }
-void CNameResourceRecord::affectNameServers(shared_ptr<QueryState>  q){ return; }
 
 
 

@@ -116,6 +116,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sn
 	
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
+	_infoMutex = make_shared<std::mutex>();
 	
 }
 
@@ -125,6 +126,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState
 	
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
+	_infoMutex = make_shared<std::mutex>();
 	
 	 _numOpsGlobalLeft = q->_numOpsGlobalLeft;
 	
@@ -212,7 +214,7 @@ void QueryState::expandNextServers(string domainName){
 
 
 
-void QueryState::expandNextServerAnswer(string domainName, string answer){
+void QueryState::expandNextServerAnswer(string domainName, ResourceRecord answer){
 			
 	_servMutex->lock();
 	for (auto servIter = _nextServers.begin(); servIter < _nextServers.end(); servIter++){
@@ -421,32 +423,23 @@ void QueryState::setMatchScore(string domainName){
 
 }
 
-vector<string> QueryState::getAnswers(){
-
-	vector<string> answers;
-	_ansMutex->lock();
-	for(auto iter = _answers.begin(); iter < _answers.end(); iter++){
-		answers.push_back(*iter);
-	}
-	_ansMutex->unlock();
-	return answers;
-	
-}
 
 void threadFunction(shared_ptr<QueryState> currS, shared_ptr<QueryState> query){
 
 	query->decrementOps();
-	vector<string> answers = currS->getAnswers();
+	_ansMutex->lock();
+	vector<string> ips = currS->_ips;
+	_ansMutex->unlock();
+	
 		
-	if(answers.size() < 1){
+	if(ips.size() < 1){
 		QueryState::solveStandardQuery(currS);
 	}
 	else{
-		for(auto iter = answers.begin(); iter < answers.end(); iter++){
-			string ans = *iter;
+		for(auto iter = ips.begin(); iter < ips.end(); iter++){
+			string ip = *iter;
 			currS->decrementOps();
-			
-			QueryState::sendStandardQuery(query, ans);
+			QueryState::sendStandardQuery(query, ip);
 			
 		}	
 		currS->forceEndQuery(true);
