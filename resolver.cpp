@@ -111,10 +111,9 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sn
 	_networkCode = (int) NetworkErrors::none;
 	_msgCode = (uint8_t) ResponseCodes::none;
 	
-	_numOpsLocalLeft = perSequenceOpCap;
-	_numOpsGlobalLeft = make_shared<unsigned int>(perSequenceOpCap);
+	_numOpsLocalLeft.store(perSequenceOpCap);
+	_numOpsGlobalLeft = make_shared<atomic<int> >(perSequenceOpCap);
 	
-	_opMutex = make_shared<std::mutex>();
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
 	
@@ -122,11 +121,10 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sn
 
 QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState* q): _sname(sname), _stype(stype), _sclass(sclass){ 
 
-	_numOpsLocalLeft = perQueryOpCap;
+	_numOpsLocalLeft.store(perQueryOpCap);
 	
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
-	_opMutex = q->_opMutex;
 	
 	 _numOpsGlobalLeft = q->_numOpsGlobalLeft;
 	
@@ -232,44 +230,29 @@ void QueryState::expandNextServerAnswer(string domainName, string answer){
 
 void QueryState::decrementOps(){
 
-	unsigned int& opsL = _numOpsLocalLeft;
-	if(opsL > 0){
-		opsL = opsL - 1;
-	}
-	
-	_opMutex->lock();
-	unsigned int& opsG = *(_numOpsGlobalLeft);
-	if(opsG > 0){
-		opsG = opsG - 1;
-	}
-	_opMutex->unlock();
-
+	_numOpsLocalLeft.store(_numOpsLocalLeft.load() - 1);
+	_numOpsGlobalLeft->store(_numOpsGlobalLeft->load() - 1);	
 
 }
 
 bool QueryState::haveLocalOpsLeft(){
 
-	return (_numOpsLocalLeft >= 1);
-}
-
-void QueryState::forceEndQuery(bool localOnly){
-
-	_numOpsLocalLeft = 0;
-
-	if(!localOnly){
-		_opMutex->lock();
-		*_numOpsGlobalLeft = 0;
-		_opMutex->unlock();
-	}
-
+	return (_numOpsLocalLeft.load() >= 1);
 }
 
 bool QueryState::haveGlobalOpsLeft(){
 
-	_opMutex->lock();
-	unsigned int opsG = *_numOpsGlobalLeft;
-	_opMutex->unlock();
-	return (opsG >= 1);
+	return (_numOpsGlobalLeft->load() >= 1);
+}
+
+void QueryState::forceEndQuery(bool localOnly){
+
+	_numOpsLocalLeft.store(0);
+
+	if(!localOnly){
+		_numOpsGlobalLeft->store(0);
+	}
+
 }
 
 
@@ -346,6 +329,18 @@ bool QueryState::checkEndCondition(){
 	if(_answers.size() > 0) end = true;
 	_ansMutex->unlock();
 	
+	_servMutex->lock();
+	bool allServersDone = true;
+	for(auto iter = _nextServers.begin(); iter < _nextServers.end(); iter++){
+		shared_ptr<QueryState> qr = *iter;
+		if(qr->haveLocalOpsLeft()){
+			allServersDone = false;
+			break;
+		}
+	}
+	_servMutex->unlock();
+	if(allServersDone) end = true;
+	
 	return end; 
 
 }
@@ -372,13 +367,26 @@ void QueryState::displayResult(){
 	_ansMutex->lock();
 	if(_answers.size() > 0){
 		cout << "query got answers : " << endl;
-		for(auto iter = _answers.begin(); iter< _answers.end(); iter++){
+		for(auto iter = _answers.begin(); iter < _answers.end(); iter++){
 		
 			cout << "ANSWER " << *iter << endl;
 		}
 	
 	}
 	_ansMutex->unlock();
+	
+	_servMutex->lock();
+	bool allServersDone = true;
+	for(auto iter = _nextServers.begin(); iter < _nextServers.end(); iter++){
+		shared_ptr<QueryState> qr = *iter;
+		if(qr->haveLocalOpsLeft()){
+			allServersDone = false;
+			break;
+		}
+	}
+	_servMutex->unlock();
+	
+	if(allServersDone) cout << " all servers depleted " << endl;
 	
 	printMutex.unlock();
 	
@@ -438,9 +446,6 @@ void threadFunction(shared_ptr<QueryState> currS, shared_ptr<QueryState> query){
 			string ans = *iter;
 			currS->decrementOps();
 			
-			//printMutex.lock();
-			//cout << "sending request to " << currS->_sname << "(" << ans << ") to resolve " << query->_sname << endl;
-			//printMutex.unlock();
 			QueryState::sendStandardQuery(query, ans);
 			
 		}	

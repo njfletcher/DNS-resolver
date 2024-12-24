@@ -151,13 +151,12 @@ class QueryState{
 		
 		//number of operations left for this specific request until failure
 		//0 means termination. This could be from exhausting ops, finding answers, or fatal errors.
-		unsigned int _numOpsLocalLeft;
+		std::atomic<int> _numOpsLocalLeft;
 		
 		//number of operations left for the series of requests that led to this one until failure
 		//0 means sequence has terminated. Same reasons as above.
-		std::shared_ptr<unsigned int> _numOpsGlobalLeft;
+		std::shared_ptr<std::atomic<int> > _numOpsGlobalLeft;
 		
-		std::shared_ptr<std::mutex> _opMutex;
 		std::shared_ptr<std::mutex> _servMutex;
 		std::shared_ptr<std::mutex> _ansMutex;
 		

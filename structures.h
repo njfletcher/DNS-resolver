@@ -10,7 +10,6 @@
 
 class QueryState;
 
-
 class DNSFlags{
 	
 	friend class DNSMessage;
@@ -60,7 +59,6 @@ class DNSHeader{
 
 };
 
-
 class QuestionRecord{
 
 	public:
@@ -82,7 +80,6 @@ class QuestionRecord{
 		uint16_t _qClass;
 
 };
-
 
 class ResourceRecord{
 
@@ -122,6 +119,28 @@ class ResourceRecord{
 
 };
 
+class DNSMessage{
+
+	public:
+		DNSMessage(const DNSHeader& hdr, std::vector<QuestionRecord>& question, std::vector<std::shared_ptr<ResourceRecord> >& answer, std::vector<std::shared_ptr<ResourceRecord> >& authority, std::vector<std::shared_ptr<ResourceRecord> >& additional);
+		DNSMessage(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end);
+		
+		void toBuffer(std::vector<uint8_t> & buffer);
+		void buildString(std::stringstream& s);
+		void print();
+		void extractData(std::shared_ptr<QueryState> qr, std::time_t time);
+		void cacheRecords(std::time_t time);
+		bool checkForResponseErrors(uint16_t qId, uint8_t& code);
+		
+	private:
+		DNSHeader _hdr;
+		std::vector<QuestionRecord> _question;// one or more questions for the name server to answer
+		std::vector<std::shared_ptr<ResourceRecord> > _answer; // zero or more resource records that answer the query
+		std::vector<std::shared_ptr<ResourceRecord> > _authority;//zero or more resource records that point to authoritative name servers
+		std::vector<std::shared_ptr<ResourceRecord> > _additional; // zero or more resource records that are strictly not answers
+
+};
+
 class NSResourceRecord: public ResourceRecord {
 	public:
 		std::string getDataAsString();
@@ -146,26 +165,17 @@ class AResourceRecord: public ResourceRecord {
 		uint32_t _ip;
 };
 
-
-class DNSMessage{
+class CNameResourceRecord: public ResourceRecord{
 
 	public:
-		DNSMessage(const DNSHeader& hdr, std::vector<QuestionRecord>& question, std::vector<std::shared_ptr<ResourceRecord> >& answer, std::vector<std::shared_ptr<ResourceRecord> >& authority, std::vector<std::shared_ptr<ResourceRecord> >& additional);
-		DNSMessage(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end);
-		
-		void toBuffer(std::vector<uint8_t> & buffer);
-		void buildString(std::stringstream& s);
-		void print();
-		void extractData(std::shared_ptr<QueryState> qr, std::time_t time);
-		void cacheRecords(std::time_t time);
-		bool checkForResponseErrors(uint16_t qId, uint8_t& code);
+		std::string getDataAsString();
+		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
+		CNameResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		void affectAnswers(std::shared_ptr<QueryState>  q);
+		void affectNameServers(std::shared_ptr<QueryState>  q);
 		
 	private:
-		DNSHeader _hdr;
-		std::vector<QuestionRecord> _question;// one or more questions for the name server to answer
-		std::vector<std::shared_ptr<ResourceRecord> > _answer; // zero or more resource records that answer the query
-		std::vector<std::shared_ptr<ResourceRecord> > _authority;//zero or more resource records that point to authoritative name servers
-		std::vector<std::shared_ptr<ResourceRecord> > _additional; // zero or more resource records that are strictly not answers
+		std::string _domain;
 
 };
 

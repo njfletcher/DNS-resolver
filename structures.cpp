@@ -742,27 +742,6 @@ vector<shared_ptr<ResourceRecord> >* ResourceRecord::getRecordsFromCache(string 
 
 }
 
-void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
-	vector<uint8_t> realDomain;
-	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &_rData);
-	_domain = convertOctetSeqToString(realDomain);
-}
-
-NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
-	convertRData(start, end);
-}
-
-
-string NSResourceRecord::getDataAsString(){
-	return _domain;
-}
-
-void NSResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ return; }
-void NSResourceRecord::affectNameServers(shared_ptr<QueryState>  q){
-
-	q->expandNextServers(getDataAsString());
-}
-
 string convertIpIntToString(uint32_t ip){
 
 	char buffer[INET_ADDRSTRLEN];
@@ -777,38 +756,6 @@ string convertIpIntToString(uint32_t ip){
 
 }
 
-void AResourceRecord::convertRData(){
-
-	if(_rData.size() < 4){
-		_ip = 0;
-	}
-	else{
-		uint32_t ip =  (((uint32_t)_rData[3]) << 24) |  (((uint32_t)_rData[2]) << 16) |  (((uint32_t)_rData[1]) << 8) |  (((uint32_t)_rData[0]));
-		_ip = ip; 
-	}
-
-}
-
-AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end,succeeded) {
-	convertRData();
-}
-
-
-string AResourceRecord::getDataAsString(){
-
-	return convertIpIntToString(_ip);
-}
-
-void AResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ 
-
-	q->expandAnswers(getDataAsString());
-
-}
-void AResourceRecord::affectNameServers(shared_ptr<QueryState>  q){
-			
-	q->expandNextServerAnswer(_realName, getDataAsString());
-	
-}
 
 
 DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, vector<shared_ptr<ResourceRecord> >& answer, vector<shared_ptr<ResourceRecord> >& authority, vector<shared_ptr<ResourceRecord> >& additional){
@@ -821,7 +768,6 @@ DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, v
 
 
 };
-
 
 
 shared_ptr<ResourceRecord> ResourceRecord::GetSpecialResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
@@ -1051,6 +997,76 @@ bool DNSMessage::checkForResponseErrors(uint16_t qId, uint8_t& code){
 	return false;
 
 }
+
+AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end,succeeded) {
+	convertRData();
+}
+
+void AResourceRecord::convertRData(){
+
+	if(_rData.size() < 4){
+		_ip = 0;
+	}
+	else{
+		uint32_t ip =  (((uint32_t)_rData[3]) << 24) |  (((uint32_t)_rData[2]) << 16) |  (((uint32_t)_rData[1]) << 8) |  (((uint32_t)_rData[0]));
+		_ip = ip; 
+	}
+
+}
+
+
+string AResourceRecord::getDataAsString(){
+
+	return convertIpIntToString(_ip);
+}
+
+void AResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ 
+
+	q->expandAnswers(getDataAsString());
+
+}
+void AResourceRecord::affectNameServers(shared_ptr<QueryState>  q){
+			
+	q->expandNextServerAnswer(_realName, getDataAsString());
+	
+}
+
+NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
+	convertRData(start, end);
+}
+
+void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
+	vector<uint8_t> realDomain;
+	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &_rData);
+	_domain = convertOctetSeqToString(realDomain);
+}
+
+string NSResourceRecord::getDataAsString(){
+	return _domain;
+}
+
+void NSResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ return; }
+void NSResourceRecord::affectNameServers(shared_ptr<QueryState>  q){
+
+	q->expandNextServers(getDataAsString());
+}
+
+CNameResourceRecord::CNameResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
+	convertRData(start, end);
+}
+
+void CNameResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
+	vector<uint8_t> realDomain;
+	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &_rData);
+	_domain = convertOctetSeqToString(realDomain);
+}
+
+string CNameResourceRecord::getDataAsString(){
+	return _domain;
+}
+
+void CNameResourceRecord::affectAnswers(shared_ptr<QueryState>  q){ return; }
+void CNameResourceRecord::affectNameServers(shared_ptr<QueryState>  q){ return; }
 
 
 
