@@ -596,6 +596,15 @@ bool ResourceRecord::operator==(ResourceRecord& r){
 
 }
 
+
+//rec is a shared pointer that points to the current object(this). 
+//need to pass the shared pointer to keep the shared pointer state chain, but also need this to be an object method for double dispatch to work.
+void ResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
+
+	query.inst->affectQuery(query, this, cont);
+
+}
+
 void ResourceRecord::toBuffer(vector<uint8_t> & buffer){
 
 	convertOctetSequenceToBuffer(_name, buffer);

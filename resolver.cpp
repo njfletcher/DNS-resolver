@@ -33,6 +33,33 @@ mutex threadMutex;
 
 atomic<bool> moreThreads(true);
 
+
+void QueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, NsResourceRecord& record, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, QueryContext cont){ return; }
+
+void AQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, QueryContext cont){
+	
+	switch(cont){
+	
+		case QueryContext::answerSection:
+			q.expandInfo(
+			
+			
+	
+	
+	
+	}
+
+}
+
+
+void AQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, QueryContext cont){ return; }
+void AQueryInstruction::affectQuery(QueryState& q, NsResourceRecord& record, QueryContext cont){ return; }
+void AQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, QueryContext cont){ return; }
+
+
 void dumpCacheToFile(){
 
 	ofstream ot("cacheDump.txt");
@@ -170,7 +197,7 @@ void loadSafeties(string filePath){
 }
 
 
-void QueryState::expandAnswers(string answer){
+void QueryState::expandAnswers(shared_ptr<ResourceRecord> rec){
 		
 	_ansMutex->lock();
 	bool unique = true;
@@ -184,6 +211,42 @@ void QueryState::expandAnswers(string answer){
 	}
 	if(unique) _answers.push_back(answer);
 	_ansMutex->unlock();
+	
+
+}
+
+void QueryState::expandIps(string ip){
+		
+	_ansMutex->lock();
+	bool unique = true;
+	for(auto iter = _ips.begin(); iter < _ips.end(); iter++){
+		if(*iter == ip){
+			unique = false;
+			break;
+		
+		}
+	
+	}
+	if(unique) _ips.push_back(ip);
+	_ansMutex->unlock();
+	
+
+}
+
+void QueryState::expandInfo(shared_ptr<ResourceRecord> rec){
+		
+	_infoMutex->lock();
+	bool unique = true;
+	for(auto iter = _extraInfo.begin(); iter < _extraInfo.end(); iter++){
+		if(*iter == rec){
+			unique = false;
+			break;
+		
+		}
+	
+	}
+	if(unique) _extraInfo.push_back(rec);
+	_infoMutex->unlock();
 	
 
 }
@@ -214,7 +277,7 @@ void QueryState::expandNextServers(string domainName){
 
 
 
-void QueryState::expandNextServerAnswer(string domainName, ResourceRecord answer){
+void QueryState::expandNextServerAnswer(string domainName, shared_ptr<ResourceRecord> answer){
 			
 	_servMutex->lock();
 	for (auto servIter = _nextServers.begin(); servIter < _nextServers.end(); servIter++){

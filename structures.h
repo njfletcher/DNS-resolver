@@ -9,6 +9,7 @@
 #include <sstream>
 
 class QueryState;
+class QueryContext;
 
 class DNSFlags{
 	
@@ -89,6 +90,8 @@ class ResourceRecord{
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 				
 		virtual std::string getDataAsString();
+		
+		virtual void executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query);
 			
 		void toBuffer(std::vector<uint8_t> & buffer);
 		void buildString(std::stringstream& s, uint16_t number = 0);
@@ -112,12 +115,6 @@ class ResourceRecord{
 		std::time_t _cacheExpireTime; //absolute expiration time used by cache
 		uint16_t _rdLength; //specified in octets
 		std::vector<uint8_t> _rData; //length of rdLength, not null terminated
-		
-		//function pointers to functions that describe how a record should affect the query when it is found in the respective section.
-		//these will point to different functions based on the type of query that is occuring, because different queries use the resource records differently.
-		void (func*) (std::shared_ptr<QueryState> q) _answerSection;
-		void (func*) (std::shared_ptr<QueryState> q) _authoritySection;
-		void (func*) (std::shared_ptr<QueryState> q) _additionalSection;
 
 };
 

@@ -21,6 +21,9 @@
 
 class DNSMessage;
 class ResourceRecord;
+class AResourceRecord;
+class NsResourceRecord;
+class CNameResourceRecord;
 
 extern std::mutex cacheMutex;
 extern std::unordered_map<std::string, std::vector< std::shared_ptr<ResourceRecord> > > cache;
@@ -91,6 +94,34 @@ enum class ResponseCodes{
 
 };
 
+enum class QueryContext{
+
+	answerSection = 0,
+	authoritySection = 1,
+	additionalSection = 2
+
+};
+
+class QueryInstruction{
+
+	virtual void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont);
+	virtual void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	virtual void affectQuery(QueryState& q, NsResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	virtual void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+
+};
+
+class AQuery : QueryInstruction{
+
+	
+	void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	void affectQuery(QueryState& q, NsResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+
+}
+
+
 
 class QueryState{
 
@@ -100,9 +131,10 @@ class QueryState{
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass);
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState* q);
 		
-		void expandAnswers(ResourceRecord answer);
-		void expandNextServerAnswer(std::string server, ResourceRecord answer);
+		void expandAnswers(std::shared_ptr<ResourceRecord> rec);
+		void expandNextServerAnswer(std::string server, std::shared_ptr<ResourceRecord> answer);
 		void expandNextServers(std::string server);
+		void expandInfo(std::shared_ptr<ResourceRecord> info);
 		void expandIps(std::string ip);
 						
 		void setMatchScore(std::string domainName);
@@ -119,7 +151,9 @@ class QueryState{
 		
 		
 	private:
-	
+		//instructions for how each type of resource record should affect this query
+		std::shared_ptr<QueryInstruction> _inst;
+		
 		//name queried
 		std::string _sname;
 	
@@ -140,16 +174,15 @@ class QueryState{
 		//name servers this request thinks will be helpful
 		std::vector<std::shared_ptr<QueryState> > _nextServers;
 		
-				
 		//absolute time the request started
 		std::time_t _startTime;
 		
 		//answers received for this query
-		std::vector<ResourceRecord> _answers;
+		std::vector<std::shared_ptr<ResourceRecord> > _answers;
 		
 		//extra information that does not directly answer the query, but needs to be displayed to the user
 		//Example: User makes an A query. Program encounters cname redirect along the way. This cname is not a real answer(A record), but it is still something the user should be aware of.
-		std::vector<ResourceRecord> _extraInfo;
+		std::vector<std::shared_ptr<ResourceRecord> > _extraInfo;
 		
 		//known ips for the server being queried
 		std::vector<std::string> _ips;
@@ -176,6 +209,7 @@ class QueryState{
 
 void loadSafeties(std::string filePath);
 void dumpCacheToFile();
+
 
 
 
