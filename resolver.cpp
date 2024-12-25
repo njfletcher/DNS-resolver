@@ -34,30 +34,44 @@ mutex threadMutex;
 atomic<bool> moreThreads(true);
 
 
-void QueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
-void QueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, QueryContext cont){ return; }
-void QueryInstruction::affectQuery(QueryState& q, NsResourceRecord& record, QueryContext cont){ return; }
-void QueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, CNameResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, AResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, NsResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, ResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 
-void AQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, QueryContext cont){
+void AQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){
 	
-	switch(cont){
-	
-		case QueryContext::answerSection:
-			q.expandInfo(
-			
-			
-	
-	
-	
+	if(cont == QueryContext::answerSection){
+		q.expandInfo(recP);
+		q.redirectQuery(record->getName());
 	}
+	//dont care about cnames in authority or additional sections(if there are any). those are cached and irrelevant directly to this query.
 
 }
 
+void AQueryInstruction::affectQuery(QueryState& q, AResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
 
-void AQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, QueryContext cont){ return; }
-void AQueryInstruction::affectQuery(QueryState& q, NsResourceRecord& record, QueryContext cont){ return; }
-void AQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, QueryContext cont){ return; }
+	
+	if(cont == QueryContext::answerSection){
+		q.expandAnswers(recP);
+		q.expandIps(record->getDataAsString());
+	}
+	
+	if(cont == QueryContext::additionalSection){
+		q.expandNextServerAnswer(recP);
+		q.expandNextServerIps(record->getName(), record->getDataAsString());
+	}
+
+
+}
+void AQueryInstruction::affectQuery(QueryState& q, NsResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	if(cont == QueryContext::authoritySection){
+		q.expandNextServers(record->getName());
+	}
+
+}
+void AQueryInstruction::affectQuery(QueryState& q, ResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 
 
 void dumpCacheToFile(){
@@ -124,6 +138,11 @@ QueryState::~QueryState(){
 
 	reclaimId(_id);
 
+}
+
+QueryState::redirectQuery(std::string sname){
+
+	_sname = sname;
 }
 
 QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sname), _stype(stype), _sclass(sclass){ 
@@ -277,14 +296,29 @@ void QueryState::expandNextServers(string domainName){
 
 
 
-void QueryState::expandNextServerAnswer(string domainName, shared_ptr<ResourceRecord> answer){
+void QueryState::expandNextServerAnswer(shared_ptr<ResourceRecord> answer){
 			
 	_servMutex->lock();
 	for (auto servIter = _nextServers.begin(); servIter < _nextServers.end(); servIter++){
 		shared_ptr<QueryState> q = *servIter;
 		
-		if(q->_sname == domainName){
+		if(q->_sname == answer->_realName){
 			q->expandAnswers(answer);
+					
+		}
+	}
+	_servMutex->unlock();
+		
+}
+
+void QueryState::expandNextServerIps(string name, string ip){
+			
+	_servMutex->lock();
+	for (auto servIter = _nextServers.begin(); servIter < _nextServers.end(); servIter++){
+		shared_ptr<QueryState> q = *servIter;
+		
+		if(q->_sname == name){
+			q->expandIps(ip);
 					
 		}
 	}
@@ -526,7 +560,7 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 		for(auto iter = directCached->begin(); iter < directCached->end(); iter++){
 	
 			shared_ptr<ResourceRecord> r = *iter;
-			r->affectAnswers(q);
+			r->executeInstructions(r, QueryContext::answerSection, q);
 		
 		}
 	}
@@ -564,7 +598,8 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 			for(auto iter = indirectCached->begin(); iter < indirectCached->end(); iter++){
 	
 				shared_ptr<ResourceRecord> r = *iter;
-				r->affectNameServers(q);
+				r->executeInstructions(r, QueryContext::authoritySection, q);
+				r->executeInstructions(r, QueryContext::additionalSection, q);
 			}
 		}
 		cacheMutex.unlock();
@@ -576,7 +611,7 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 	
 		pair<string, string> safeNs = *safetyIter;
 		q->expandNextServers(safeNs.second);
-		q->expandNextServerAnswer(safeNs.second, safeNs.first);
+		q->expandNextServerIps(safeNs.second, safeNs.first);
 	
 	}
 	

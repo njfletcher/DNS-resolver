@@ -104,24 +104,22 @@ enum class QueryContext{
 
 class QueryInstruction{
 
-	virtual void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont);
-	virtual void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-	virtual void affectQuery(QueryState& q, NsResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-	virtual void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	virtual void affectQuery(QueryState& q, CNameResourceRecord* record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont);
+	virtual void affectQuery(QueryState& q, AResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	virtual void affectQuery(QueryState& q, NsResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	virtual void affectQuery(QueryState& q, ResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 
 };
 
 class AQuery : QueryInstruction{
 
 	
-	void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-	void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-	void affectQuery(QueryState& q, NsResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-	void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	void affectQuery(QueryState& q, CNameResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	void affectQuery(QueryState& q, AResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	void affectQuery(QueryState& q, NsResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+	void affectQuery(QueryState& q, ResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 
 }
-
-
 
 class QueryState{
 
@@ -132,10 +130,11 @@ class QueryState{
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState* q);
 		
 		void expandAnswers(std::shared_ptr<ResourceRecord> rec);
-		void expandNextServerAnswer(std::string server, std::shared_ptr<ResourceRecord> answer);
+		void expandNextServerAnswer(std::shared_ptr<ResourceRecord> answer);
 		void expandNextServers(std::string server);
 		void expandInfo(std::shared_ptr<ResourceRecord> info);
 		void expandIps(std::string ip);
+		void expandNextServerIps(std::string name, std::string ip);
 						
 		void setMatchScore(std::string domainName);
 		static void solveStandardQuery(std::shared_ptr<QueryState> q);
@@ -148,6 +147,8 @@ class QueryState{
 		bool haveGlobalOpsLeft();
 		void decrementOps();
 		void forceEndQuery(bool localOnly);
+		
+		void redirectQuery(std::string sname);
 		
 		
 	private:

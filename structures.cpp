@@ -590,6 +590,8 @@ string ResourceRecord::getDataAsString(){
 	return s;
 }
 
+string ResourceRecord::getName(){ return _realName; }
+
 bool ResourceRecord::operator==(ResourceRecord& r){
 
 	return (_realName == r._realName) && (_rType == r._rType) && (getDataAsString() == r.getDataAsString());
@@ -931,7 +933,7 @@ void DNSMessage::extractData(shared_ptr<QueryState> qr, std::time_t time){
 	if(numAnswersClaim > 0){
 		
 		for(size_t i =0; i < numAnswersActual; i++){
-			_answer[i]->affectAnswers(qr);
+			_answer[i]->executeInstructions(_answer[i], QueryContext::answerSection, qr);
 		
 		}
 	}
@@ -940,7 +942,7 @@ void DNSMessage::extractData(shared_ptr<QueryState> qr, std::time_t time){
 	size_t numAuthActual = _authority.size();
 	if(numAuthClaim > 0){
 		for(size_t i =0; i < numAuthActual; i++){
-			_authority[i]->affectNameServers(qr);
+			_authority[i]->executeInstructions(_authority[i], QueryContext::authoritySection, qr);
 		}
 	
 	}
@@ -950,7 +952,7 @@ void DNSMessage::extractData(shared_ptr<QueryState> qr, std::time_t time){
 	if(numAdditClaim > 0){
 		
 		for(size_t i =0; i < numAdditActual; i++){
-			_additional[i]->affectNameServers(qr);
+			_additional[i]->executeInstructions(_additional[i], QueryContext::additionalSection, qr);
 		
 		}
 		

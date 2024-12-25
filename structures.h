@@ -90,7 +90,7 @@ class ResourceRecord{
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 				
 		virtual std::string getDataAsString();
-		
+		std::string getName();
 		virtual void executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query);
 			
 		void toBuffer(std::vector<uint8_t> & buffer);

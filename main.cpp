@@ -9,18 +9,20 @@
 
 using namespace std;
 
-#define argCount 3
+const string domainCommand = "-d";
+const string queryTypeCommand = "-t";
+const string helpCommand = "-h";
 
 int main(int argc, char** argv){
 
-	if(argc < argCount){
-		cout << "provide a domain name and safety file" << endl;
+	if(argc < 2){
+		cout << "Resolver needs at least one argument. Use ./resolver -h for more information." << endl;
 		return -1;
 	
 	}
 	
 	
-	loadSafeties(argv[2]);
+	loadSafeties("/home/kali/DNS-resolver/sbelt.txt");
 
 	
 	shared_ptr<QueryState> q = make_shared<QueryState>(argv[1], (uint16_t)ResourceTypes::a,  (uint16_t)ResourceClasses::in);
