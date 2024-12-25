@@ -9,7 +9,7 @@
 #include <sstream>
 
 class QueryState;
-class QueryContext;
+enum class QueryContext;
 
 class DNSFlags{
 	
@@ -89,6 +89,7 @@ class ResourceRecord{
 		ResourceRecord(const char * name, uint16_t rType, uint16_t rClass, uint32_t ttl, uint16_t rdLength, std::vector<uint8_t> rData, bool auth);
 		ResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
 				
+		virtual ~ResourceRecord() = default;
 		virtual std::string getDataAsString();
 		std::string getName();
 		virtual void executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query);
@@ -142,6 +143,7 @@ class DNSMessage{
 
 class NSResourceRecord: public ResourceRecord {
 	public:
+		~NSResourceRecord() = default;
 		std::string getDataAsString();
 		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
 		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
@@ -152,6 +154,7 @@ class NSResourceRecord: public ResourceRecord {
 
 class AResourceRecord: public ResourceRecord {
 	public:
+		~AResourceRecord() = default;
 		std::string getDataAsString();
 		void convertRData();
 		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
@@ -163,6 +166,7 @@ class AResourceRecord: public ResourceRecord {
 class CNameResourceRecord: public ResourceRecord{
 
 	public:
+		~CNameResourceRecord() = default;
 		std::string getDataAsString();
 		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
 		CNameResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);

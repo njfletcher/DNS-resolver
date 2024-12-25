@@ -145,7 +145,7 @@ QueryState::redirectQuery(std::string sname){
 	_sname = sname;
 }
 
-QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass): _sname(sname), _stype(stype), _sclass(sclass){ 
+QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, shared_ptr<QueryInstruction> qI): _sname(sname), _stype(stype), _sclass(sclass), _inst(qI){ 
 
 
 	_beingUsed.store(false);
