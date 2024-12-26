@@ -22,7 +22,7 @@
 class DNSMessage;
 class ResourceRecord;
 class AResourceRecord;
-class NsResourceRecord;
+class NSResourceRecord;
 class CNameResourceRecord;
 class QueryState;
 
@@ -107,10 +107,10 @@ class QueryInstruction{
 
 	public:
 		virtual ~QueryInstruction() = default;
-		virtual void affectQuery(QueryState& q, CNameResourceRecord* record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont);
-		virtual void affectQuery(QueryState& q, AResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-		virtual void affectQuery(QueryState& q, NSResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-		virtual void affectQuery(QueryState& q, ResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		virtual void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont);
+		virtual void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		virtual void affectQuery(QueryState& q, NSResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		virtual void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 
 };
 
@@ -118,10 +118,10 @@ class AQueryInstruction : public QueryInstruction{
 	
 	public:
 		~AQueryInstruction() = default;
-		void affectQuery(QueryState& q, CNameResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-		void affectQuery(QueryState& q, AResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-		void affectQuery(QueryState& q, NSResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-		void affectQuery(QueryState& q, ResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, NSResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 
 };
 
@@ -140,8 +140,6 @@ class QueryState{
 		void expandInfo(std::shared_ptr<ResourceRecord> info);
 		void expandIps(std::string ip);
 		void expandNextServerIps(std::string name, std::string ip);
-		
-		void affectQuery(ResourceRecord* record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont);
 						
 		void setMatchScore(std::string domainName);
 		static void solveStandardQuery(std::shared_ptr<QueryState> q);
@@ -157,10 +155,10 @@ class QueryState{
 		
 		void redirectQuery(std::string sname);
 		
-		
-	private:
 		//instructions for how each type of resource record should affect this query
 		std::shared_ptr<QueryInstruction> _inst;
+		
+	private:
 		
 		//name queried
 		std::string _sname;

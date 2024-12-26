@@ -595,7 +595,24 @@ bool ResourceRecord::operator==(ResourceRecord& r){
 //need to pass the shared pointer to keep the shared pointer state chain, but also need this to be an object method for double dispatch to work.
 void ResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
 
-	query.affectQuery(this, rec, cont);
+	query._inst->affectQuery(query, *this, rec, cont);
+
+}
+
+void AResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
+
+	query._inst->affectQuery(query, *this, rec, cont);
+
+}
+void NSResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
+
+	query._inst->affectQuery(query, *this, rec, cont);
+
+}
+
+void CNameResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
+
+	query._inst->affectQuery(query, *this, rec, cont);
 
 }
 

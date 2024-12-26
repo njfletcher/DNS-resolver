@@ -34,50 +34,44 @@ mutex threadMutex;
 atomic<bool> moreThreads(true);
 
 
-void QueryState::affectQuery(ResourceRecord* record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont){
-	
-	_inst->affectQuery(*this, record, recP, cont);
+void QueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 
-}
-
-void QueryInstruction::affectQuery(QueryState& q, CNameResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
-void QueryInstruction::affectQuery(QueryState& q, AResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
-void QueryInstruction::affectQuery(QueryState& q, NSResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
-void QueryInstruction::affectQuery(QueryState& q, ResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
-
-void AQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){
+void AQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){
 	
 	if(cont == QueryContext::answerSection){
 		q.expandInfo(recP);
-		q.redirectQuery(record->getName());
+		q.redirectQuery(record.getName());
 	}
 	//dont care about cnames in authority or additional sections(if there are any). those are cached and irrelevant directly to this query.
 
 }
 
-void AQueryInstruction::affectQuery(QueryState& q, AResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+void AQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
 
 	
 	if(cont == QueryContext::answerSection){
 		q.expandAnswers(recP);
-		q.expandIps(record->getDataAsString());
+		q.expandIps(record.getDataAsString());
 	}
 	
 	if(cont == QueryContext::additionalSection){
 		q.expandNextServerAnswer(recP);
-		q.expandNextServerIps(record->getName(), record->getDataAsString());
+		q.expandNextServerIps(record.getName(), record.getDataAsString());
 	}
 
 
 }
-void AQueryInstruction::affectQuery(QueryState& q, NSResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+void AQueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
 
 	if(cont == QueryContext::authoritySection){
-		q.expandNextServers(record->getName());
+		q.expandNextServers(record.getDataAsString());
 	}
 
 }
-void AQueryInstruction::affectQuery(QueryState& q, ResourceRecord* record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void AQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 
 
 void dumpCacheToFile(){
@@ -187,6 +181,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState
 	_msgCode = (uint8_t) ResponseCodes::none;
 	_startTime = time(NULL);
 	_id = pickNextId();
+	_inst = q->_inst;
 }
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
@@ -474,7 +469,9 @@ void QueryState::displayResult(){
 		cout << "query got answers : " << endl;
 		for(auto iter = _answers.begin(); iter < _answers.end(); iter++){
 		
-			cout << "ANSWER " << *iter << endl;
+			shared_ptr<ResourceRecord> r = *iter;
+			cout << "ANSWER " << endl;
+			r->print();
 		}
 	
 	}

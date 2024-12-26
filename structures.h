@@ -147,6 +147,7 @@ class NSResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
 		NSResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		void executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query);
 		
 	private:
 		std::string _domain;
@@ -158,6 +159,7 @@ class AResourceRecord: public ResourceRecord {
 		std::string getDataAsString();
 		void convertRData();
 		AResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		void executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query);
 		
 	private:
 		uint32_t _ip;
@@ -170,6 +172,7 @@ class CNameResourceRecord: public ResourceRecord{
 		std::string getDataAsString();
 		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
 		CNameResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		void executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query);
 		
 	private:
 		std::string _domain;
