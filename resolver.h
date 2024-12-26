@@ -24,6 +24,7 @@ class ResourceRecord;
 class AResourceRecord;
 class NsResourceRecord;
 class CNameResourceRecord;
+class QueryState;
 
 extern std::mutex cacheMutex;
 extern std::unordered_map<std::string, std::vector< std::shared_ptr<ResourceRecord> > > cache;
@@ -108,7 +109,7 @@ class QueryInstruction{
 		virtual ~QueryInstruction() = default;
 		virtual void affectQuery(QueryState& q, CNameResourceRecord* record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont);
 		virtual void affectQuery(QueryState& q, AResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-		virtual void affectQuery(QueryState& q, NsResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		virtual void affectQuery(QueryState& q, NSResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 		virtual void affectQuery(QueryState& q, ResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 
 };
@@ -119,7 +120,7 @@ class AQueryInstruction : public QueryInstruction{
 		~AQueryInstruction() = default;
 		void affectQuery(QueryState& q, CNameResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 		void affectQuery(QueryState& q, AResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
-		void affectQuery(QueryState& q, NsResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, NSResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 		void affectQuery(QueryState& q, ResourceRecord* record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 
 };
@@ -139,6 +140,8 @@ class QueryState{
 		void expandInfo(std::shared_ptr<ResourceRecord> info);
 		void expandIps(std::string ip);
 		void expandNextServerIps(std::string name, std::string ip);
+		
+		void affectQuery(ResourceRecord* record, std::shared_ptr<ResourceRecord> recP,  QueryContext cont);
 						
 		void setMatchScore(std::string domainName);
 		static void solveStandardQuery(std::shared_ptr<QueryState> q);

@@ -533,9 +533,6 @@ ResourceRecord::ResourceRecord(const char * name, uint16_t rType, uint16_t rClas
 	_rData = rData;
 	_realName = string(name);
 	convertCStringToOctetForm(name, _name);
-	_addToAnswers = false;
-	_addToServers = false;
-	_addToIps = false;
 
 }
 
@@ -571,12 +568,7 @@ ResourceRecord::ResourceRecord(const vector<uint8_t>::iterator start, vector<uin
 		_rData.push_back(*iter);
 		iter = iter + 1;
 	}
-	
-	_addToAnswers = false;
-	_addToServers = false;
-	_addToIps = false;
-	
-	
+		
 }
 
 string ResourceRecord::getDataAsString(){
@@ -603,7 +595,7 @@ bool ResourceRecord::operator==(ResourceRecord& r){
 //need to pass the shared pointer to keep the shared pointer state chain, but also need this to be an object method for double dispatch to work.
 void ResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
 
-	query.inst->affectQuery(query, this, cont);
+	query.affectQuery(this, rec, cont);
 
 }
 
@@ -933,7 +925,7 @@ void DNSMessage::extractData(shared_ptr<QueryState> qr, std::time_t time){
 	if(numAnswersClaim > 0){
 		
 		for(size_t i =0; i < numAnswersActual; i++){
-			_answer[i]->executeInstructions(_answer[i], QueryContext::answerSection, qr);
+			_answer[i]->executeInstructions(_answer[i], QueryContext::answerSection, *qr);
 		
 		}
 	}
@@ -942,7 +934,7 @@ void DNSMessage::extractData(shared_ptr<QueryState> qr, std::time_t time){
 	size_t numAuthActual = _authority.size();
 	if(numAuthClaim > 0){
 		for(size_t i =0; i < numAuthActual; i++){
-			_authority[i]->executeInstructions(_authority[i], QueryContext::authoritySection, qr);
+			_authority[i]->executeInstructions(_authority[i], QueryContext::authoritySection, *qr);
 		}
 	
 	}
@@ -952,7 +944,7 @@ void DNSMessage::extractData(shared_ptr<QueryState> qr, std::time_t time){
 	if(numAdditClaim > 0){
 		
 		for(size_t i =0; i < numAdditActual; i++){
-			_additional[i]->executeInstructions(_additional[i], QueryContext::additionalSection, qr);
+			_additional[i]->executeInstructions(_additional[i], QueryContext::additionalSection, *qr);
 		
 		}
 		
@@ -1015,9 +1007,6 @@ bool DNSMessage::checkForResponseErrors(uint16_t qId, uint8_t& code){
 
 AResourceRecord::AResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end,succeeded) {
 	convertRData();
-	_addToAnswers = true;
-	_addToServers = false;
-	_addToIps = true;
 }
 
 void AResourceRecord::convertRData(){
@@ -1040,9 +1029,6 @@ string AResourceRecord::getDataAsString(){
 
 NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
 	convertRData(start, end);
-	_addToAnswers = false;
-	_addToServers = true;
-	_addToIps = false;
 }
 
 void NSResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
