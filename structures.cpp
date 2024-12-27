@@ -423,7 +423,7 @@ string convertOctetSeqToString(const vector<uint8_t> & nameSequence){
 	uint8_t currCounter = 0;
 	bool first = true;
 	
-	for(auto iter = nameSequence.begin(); iter != nameSequence.end(); iter++){
+	for(auto iter = nameSequence.begin(); iter < nameSequence.end(); iter++){
 	
 		//this byte should be a length byte(dont want any length byte or compression byte in this string)
 		if(currCounter >= currLength){

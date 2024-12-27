@@ -466,13 +466,22 @@ void QueryState::displayResult(){
 		for(auto iter = _answers.begin(); iter < _answers.end(); iter++){
 		
 			shared_ptr<ResourceRecord> r = *iter;
-			cout << "ANSWER " << endl;
-			r->print();
+			cout << "ANSWER " << r->getDataAsString() << endl;
 		}
 		_ansMutex->unlock();
+		_infoMutex->lock();
+		cout << "query info : " << endl;
+		for(auto iter = _extraInfo.begin(); iter < _extraInfo.end(); iter++){
+		
+			shared_ptr<ResourceRecord> r = *iter;
+			cout << "info " << endl;
+			r->print();
+		}
+		_infoMutex->unlock();
 		printMutex.unlock();
 		return;
-	
+		
+
 	}
 	_ansMutex->unlock();
 	
@@ -650,6 +659,8 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 		
 		if(q->checkEndCondition()) break;
 		if(!moreThreads.load()) break;
+		
+		
 		
 	
 		vector<shared_ptr<QueryState> > nextServers;
