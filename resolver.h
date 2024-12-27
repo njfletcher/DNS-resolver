@@ -165,6 +165,8 @@ class QueryState{
 	
 		//true if this query state is currently being answered by some thread. this avoids double resolving
 		std::atomic<bool> _beingUsed;
+		
+		std::atomic<bool> _redirected;
 	
 		//id of the original query
 		uint16_t _id;

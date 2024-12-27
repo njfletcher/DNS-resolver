@@ -43,7 +43,7 @@ void AQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, 
 	
 	if(cont == QueryContext::answerSection){
 		q.expandInfo(recP);
-		q.redirectQuery(record.getName());
+		q.redirectQuery(record.getDataAsString());
 	}
 	//dont care about cnames in authority or additional sections(if there are any). those are cached and irrelevant directly to this query.
 
@@ -143,12 +143,21 @@ QueryState::~QueryState(){
 void QueryState::redirectQuery(std::string sname){
 
 	_sname = sname;
+	_redirected.store(true);
+	_servMutex->lock();
+	for(auto iter = _nextServers.begin(); iter < _nextServers.end(); iter++){
+		shared_ptr<QueryState> q = *iter;
+		q->forceEndQuery(true);
+	}
+	_nextServers.clear();
+	_servMutex->unlock();
 }
 
 QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, shared_ptr<QueryInstruction> qI): _sname(sname), _stype(stype), _sclass(sclass), _inst(qI){ 
 
 
 	_beingUsed.store(false);
+	_redirected.store(false);
 	_id = pickNextId();
 	_matchScore = 0;
 	
@@ -177,6 +186,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState
 	 _numOpsGlobalLeft = q->_numOpsGlobalLeft;
 	
 	_beingUsed.store(false);
+	_redirected.store(false);
 	_networkCode = (int) NetworkErrors::none;
 	_msgCode = (uint8_t) ResponseCodes::none;
 	_startTime = time(NULL);
@@ -449,20 +459,6 @@ void QueryState::displayResult(){
 
 
 	printMutex.lock();
-	if(!haveGlobalOpsLeft()){
-		cout << "query ran out of global ops" << endl;
-	
-	}
-	
-	if(!haveLocalOpsLeft()){
-		cout << "query ran out of local ops" << endl;
-	
-	}
-	
-	if(_msgCode == (uint8_t)ResponseCodes::name || _msgCode == (uint8_t)ResponseCodes::format){
-	
-		cout << "query encountered a fatal error" << endl;
-	}
 	
 	_ansMutex->lock();
 	if(_answers.size() > 0){
@@ -473,9 +469,36 @@ void QueryState::displayResult(){
 			cout << "ANSWER " << endl;
 			r->print();
 		}
+		_ansMutex->unlock();
+		printMutex.unlock();
+		return;
 	
 	}
 	_ansMutex->unlock();
+	
+	
+	if(!haveGlobalOpsLeft()){
+		cout << "query ran out of global ops" << endl;
+		printMutex.unlock();
+		return;
+	
+	}
+	
+	if(!haveLocalOpsLeft()){
+		cout << "query ran out of local ops" << endl;
+		printMutex.unlock();
+		return;
+	
+	}
+	
+	if(_msgCode == (uint8_t)ResponseCodes::name || _msgCode == (uint8_t)ResponseCodes::format){
+	
+		cout << "query encountered a fatal error" << endl;
+		printMutex.unlock();
+		return;
+	}
+	
+	
 	
 	_servMutex->lock();
 	bool allServersDone = true;
@@ -620,6 +643,15 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 	
 	while(true){
 	
+		if(q->_redirected.load()){
+			q->_redirected.store(false);
+			solveStandardQuery(q);
+		}
+		
+		if(q->checkEndCondition()) break;
+		if(!moreThreads.load()) break;
+		
+	
 		vector<shared_ptr<QueryState> > nextServers;
 	
 		q->_servMutex->lock();
@@ -646,9 +678,8 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 			
 		}
 		
-		//dumpCacheToFile();
-		if(q->checkEndCondition()) break;
-		if(!moreThreads.load()) break;
+		
+		
 			
 	}
 	

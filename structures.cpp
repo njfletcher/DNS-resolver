@@ -753,7 +753,7 @@ vector<shared_ptr<ResourceRecord> >* ResourceRecord::getRecordsFromCache(string 
 		
 		for(auto iter = records.begin(); iter < records.end();){
 			shared_ptr<ResourceRecord>& r = *iter;
-			if(r->_cacheExpireTime > time(NULL)){
+			if(r->_cacheExpireTime < time(NULL)){
 				iter = records.erase(iter);
 			}
 			else iter++;
@@ -796,19 +796,19 @@ DNSMessage::DNSMessage(const DNSHeader& hdr, vector<QuestionRecord>& question, v
 
 shared_ptr<ResourceRecord> ResourceRecord::GetSpecialResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded){
 
-	if(_rType == (uint16_t) ResourceTypes::a){
-		
-		return make_shared<AResourceRecord>(start,iter,end,succeeded);
-	}
-	else if(_rType == (uint16_t) ResourceTypes::ns){
+	uint16_t rType = (uint16_t) _rType;
 	
-		return make_shared<NSResourceRecord>(start,iter,end,succeeded);
+	switch(rType){
 	
-	}
-	else{
-	
-		return make_shared<ResourceRecord>(start,iter,end,succeeded);
-	
+		case (uint16_t) ResourceTypes::a:
+			return make_shared<AResourceRecord>(start,iter,end,succeeded);
+		case (uint16_t) ResourceTypes::ns:
+			return make_shared<NSResourceRecord>(start,iter,end,succeeded);
+		case (uint16_t) ResourceTypes::cname:
+			return make_shared<CNameResourceRecord>(start,iter,end,succeeded);
+		default:
+			return make_shared<ResourceRecord>(start,iter,end,succeeded);
+
 	}
 }
 
