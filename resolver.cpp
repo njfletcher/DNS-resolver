@@ -45,8 +45,6 @@ void AQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, 
 		q.expandInfo(recP);
 		q.redirectQuery(record.getDataAsString());
 	}
-	//dont care about cnames in authority or additional sections(if there are any). those are cached and irrelevant directly to this query.
-
 }
 
 void AQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
@@ -72,6 +70,123 @@ void AQueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, sha
 
 }
 void AQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+
+
+void CNameQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){
+	
+	if(cont == QueryContext::answerSection){
+		q.expandAnswers(recP);
+	}
+
+}
+
+void CNameQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	
+	if(cont == QueryContext::answerSection){
+		q.expandIps(record.getDataAsString());
+	}
+	
+	if(cont == QueryContext::additionalSection){
+		q.expandNextServerIps(record.getName(), record.getDataAsString());
+	}
+
+
+}
+void CNameQueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	if(cont == QueryContext::authoritySection){
+		q.expandNextServers(record.getDataAsString());
+	}
+
+}
+void CNameQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+
+
+void NSQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){
+	
+	if(cont == QueryContext::answerSection){
+		q.expandInfo(recP);
+		q.redirectQuery(record.getDataAsString());
+	}
+
+}
+
+void NSQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	
+	if(cont == QueryContext::answerSection){
+		q.expandIps(record.getDataAsString());
+	}
+	
+	if(cont == QueryContext::additionalSection){
+		q.expandNextServerIps(record.getName(), record.getDataAsString());
+	}
+
+
+}
+void NSQueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	if(cont == QueryContext::authoritySection){
+		q.expandNextServers(record.getDataAsString());
+	}
+	if(cont == QueryContext::answerSection){
+		q.expandAnswers(recP);
+	}
+	if(cont == QueryContext::additionalSection){
+		q.expandNextServerAnswer(recP);
+	
+	}
+
+}
+void NSQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+
+void AllQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){
+	
+	if(cont == QueryContext::answerSection){
+		q.expandInfo(recP);
+		q.redirectQuery(record.getDataAsString());
+	}
+
+}
+
+void AllQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	
+	if(cont == QueryContext::answerSection){
+		q.expandIps(record.getDataAsString());
+		q.expandAnswers(recP);
+	}
+	
+	if(cont == QueryContext::additionalSection){
+		q.expandNextServerIps(record.getName(), record.getDataAsString());
+	}
+
+
+}
+void AllQueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	if(cont == QueryContext::authoritySection){
+		q.expandNextServers(record.getDataAsString());
+	}
+	if(cont == QueryContext::answerSection){
+		q.expandAnswers(recP);
+	}
+	if(cont == QueryContext::additionalSection){
+		q.expandNextServerAnswer(recP);
+	
+	}
+
+}
+void AllQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	if(cont == QueryContext::answerSection){
+		q.expandAnswers(recP);
+	}
+
+}
+
+
 
 
 void dumpCacheToFile(){
@@ -155,7 +270,6 @@ void QueryState::redirectQuery(std::string sname){
 
 QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, shared_ptr<QueryInstruction> qI): _sname(sname), _stype(stype), _sclass(sclass), _inst(qI){ 
 
-
 	_beingUsed.store(false);
 	_redirected.store(false);
 	_id = pickNextId();
@@ -175,10 +289,13 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, shared_ptr
 	
 }
 
-QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, QueryState* q): _sname(sname), _stype(stype), _sclass(sclass){ 
+QueryState::QueryState(string sname, QueryState* q): _sname(sname){ 
 
-	_numOpsLocalLeft.store(perQueryOpCap);
+	//since this is a follow up query, only care about this domain's address(for use in resolving the original query).
+	_stype = (uint16_t) ResourceTypes::a;
+	_sclass = (uint16_t) ResourceClasses::in;
 	
+	_numOpsLocalLeft.store(perQueryOpCap);
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
 	_infoMutex = make_shared<std::mutex>();
@@ -297,7 +414,7 @@ void QueryState::expandNextServers(string domainName){
 		}
 	}			
 	if(isUniqueName){
-		_nextServers.push_back(make_shared<QueryState>(domainName, _stype, _sclass, this));
+		_nextServers.push_back(make_shared<QueryState>(domainName, this));
 		shared_ptr<QueryState> nQ = _nextServers[_nextServers.size()-1];
 		nQ->setMatchScore(_sname);
 	}

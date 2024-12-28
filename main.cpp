@@ -120,6 +120,24 @@ shared_ptr<QueryState> buildQuery(string domain, string type, bool& success){
 		return make_shared<QueryState>(domain, (uint16_t)ResourceTypes::a, (uint16_t)ResourceClasses::in, qi);
 		
 	}
+	else if(type == "CName"){
+		success = true;
+		shared_ptr<QueryInstruction> qi = make_shared<CNameQueryInstruction>();
+		return make_shared<QueryState>(domain, (uint16_t)ResourceTypes::cname, (uint16_t)ResourceClasses::in, qi);
+	
+	}
+	else if(type == "NS"){
+		success = true;
+		shared_ptr<QueryInstruction> qi = make_shared<NSQueryInstruction>();
+		return make_shared<QueryState>(domain, (uint16_t)ResourceTypes::ns, (uint16_t)ResourceClasses::in, qi);
+	
+	}
+	else if(type == "All"){
+		success = true;
+		shared_ptr<QueryInstruction> qi = make_shared<AllQueryInstruction>();
+		return make_shared<QueryState>(domain, (uint16_t)ResourceTypes::all, (uint16_t)ResourceClasses::in, qi);
+	
+	}
 	else{
 		cout << "Query type " + type + " is not supported yet. Use the " + helpCommand + " command for a list of supported types." << endl;
 		success = false;

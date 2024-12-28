@@ -125,13 +125,46 @@ class AQueryInstruction : public QueryInstruction{
 
 };
 
+class CNameQueryInstruction : public QueryInstruction{
+	
+	public:
+		~CNameQueryInstruction() = default;
+		void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, NSResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+
+};
+
+class AllQueryInstruction : public QueryInstruction{
+	
+	public:
+		~AllQueryInstruction() = default;
+		void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, NSResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+
+};
+
+class NSQueryInstruction : public QueryInstruction{
+	
+	public:
+		~NSQueryInstruction() = default;
+		void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, NSResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+
+};
+
 class QueryState{
 
 	public:		
 		
 		~QueryState();
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, std::shared_ptr<QueryInstruction> qI);
-		QueryState(std::string sname, uint16_t stype, uint16_t sclass, QueryState* q);
+		QueryState(std::string sname, QueryState* q);
 		QueryState() = default;
 		
 		void expandAnswers(std::shared_ptr<ResourceRecord> rec);
