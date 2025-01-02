@@ -179,4 +179,18 @@ class CNameResourceRecord: public ResourceRecord{
 
 };
 
+class PtrResourceRecord: public ResourceRecord{
+
+	public:
+		~PtrResourceRecord() = default;
+		std::string getDataAsString();
+		void convertRData(std::vector<uint8_t>::iterator msgStart, std::vector<uint8_t>::iterator msgEnd);
+		PtrResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		void executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query);
+		
+	private:
+		std::string _domain;
+
+};
+
 

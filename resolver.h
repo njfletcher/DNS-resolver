@@ -25,6 +25,7 @@ class AResourceRecord;
 class NSResourceRecord;
 class CNameResourceRecord;
 class QueryState;
+class PtrResourceRecord;
 
 extern std::mutex cacheMutex;
 extern std::unordered_map<std::string, std::vector< std::shared_ptr<ResourceRecord> > > cache;
@@ -111,6 +112,7 @@ class QueryInstruction{
 		virtual void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 		virtual void affectQuery(QueryState& q, NSResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 		virtual void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		virtual void affectQuery(QueryState& q, PtrResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
 
 };
 
@@ -158,6 +160,18 @@ class NSQueryInstruction : public QueryInstruction{
 
 };
 
+class PtrQueryInstruction : public QueryInstruction{
+	
+	public:
+		~PtrQueryInstruction() = default;
+		void affectQuery(QueryState& q, CNameResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, AResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, NSResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, ResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+		void affectQuery(QueryState& q, PtrResourceRecord& record, std::shared_ptr<ResourceRecord> recP, QueryContext cont);
+
+};
+
 class QueryState{
 
 	public:		
@@ -166,6 +180,7 @@ class QueryState{
 		QueryState(std::string sname, uint16_t stype, uint16_t sclass, std::shared_ptr<QueryInstruction> qI);
 		QueryState(std::string sname, QueryState* q);
 		QueryState() = default;
+		QueryState(const QueryState& q) = delete;
 		
 		void expandAnswers(std::shared_ptr<ResourceRecord> rec);
 		void expandNextServerAnswer(std::shared_ptr<ResourceRecord> answer);

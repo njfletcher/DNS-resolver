@@ -16,9 +16,9 @@ const string helpCommand = "-help";
 const string quitCommand = "-quit";
 const string queryCommand = "-query";
 
-const string startMessage = "DNS Resolver built by Nicholas Fletcher. Command loop started...\n";
+const string startMessage = "DNS Resolver. Command loop started...\n";
 
-const string helpMessage = quitCommand + " to quit. " + helpCommand + " for help. " + domainCommand + " flag specifies a domain to resolve. " + typeCommand + " flag specifies the type of query.\n Currently supported query types: \n -A: address query \n -CName: canonical name query \n -Ns: name server query \n";
+const string helpMessage = quitCommand + " to quit. " + helpCommand + " for help. " + domainCommand + " flag specifies a domain to resolve. \n "  + typeCommand + " flag specifies the type of query.\n Currently supported query types: \n -A: address query \n -CName: canonical name query \n -Ns: name server query \n -All: all record query \n -Ptr: domain pointer query";
 
 
 enum class PrimaryCommand{
@@ -138,6 +138,12 @@ shared_ptr<QueryState> buildQuery(string domain, string type, bool& success){
 		return make_shared<QueryState>(domain, (uint16_t)ResourceTypes::all, (uint16_t)ResourceClasses::in, qi);
 	
 	}
+	else if(type == "Ptr"){
+		success = true;
+		shared_ptr<QueryInstruction> qi = make_shared<PtrQueryInstruction>();
+		return make_shared<QueryState>(domain, (uint16_t)ResourceTypes::ptr, (uint16_t)ResourceClasses::in, qi);
+	
+	}
 	else{
 		cout << "Query type " + type + " is not supported yet. Use the " + helpCommand + " command for a list of supported types." << endl;
 		success = false;
@@ -150,7 +156,7 @@ shared_ptr<QueryState> buildQuery(string domain, string type, bool& success){
 
 void makeQuery(string domain, string type){
 
-	loadSafeties("/home/kali/DNS-resolver/sbelt.txt");
+	loadSafeties("./safety.txt");
 
 	bool success = false;
 	shared_ptr<QueryState> q = buildQuery(domain,type,success);
@@ -225,6 +231,10 @@ int main(int argc, char** argv){
 				string domain;
 				string type;
 				parseQuery(commandParts,domain,type);
+				if(domain == "" || type == ""){
+					cout << "missing query argument" << endl;
+					break;
+				}
 				makeQuery(domain,type);
 				break;
 			}

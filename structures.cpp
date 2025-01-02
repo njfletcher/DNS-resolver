@@ -611,6 +611,12 @@ void NSResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, 
 }
 
 void CNameResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
+	
+	query._inst->affectQuery(query, *this, rec, cont);
+
+}
+
+void PtrResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
 
 	query._inst->affectQuery(query, *this, rec, cont);
 
@@ -806,6 +812,8 @@ shared_ptr<ResourceRecord> ResourceRecord::GetSpecialResourceRecord(const vector
 			return make_shared<NSResourceRecord>(start,iter,end,succeeded);
 		case (uint16_t) ResourceTypes::cname:
 			return make_shared<CNameResourceRecord>(start,iter,end,succeeded);
+		case (uint16_t) ResourceTypes::ptr:
+			return make_shared<PtrResourceRecord>(start,iter,end,succeeded);
 		default:
 			return make_shared<ResourceRecord>(start,iter,end,succeeded);
 
@@ -1069,6 +1077,20 @@ void CNameResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vecto
 }
 
 string CNameResourceRecord::getDataAsString(){
+	return _domain;
+}
+
+PtrResourceRecord::PtrResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
+	convertRData(start, end);
+}
+
+void PtrResourceRecord::convertRData(vector<uint8_t>::iterator msgStart, vector<uint8_t>::iterator msgEnd){
+	vector<uint8_t> realDomain;
+	convertBufferNameToVector(msgStart , msgStart, msgEnd, realDomain, 0, &_rData);
+	_domain = convertOctetSeqToString(realDomain);
+}
+
+string PtrResourceRecord::getDataAsString(){
 	return _domain;
 }
 

@@ -38,6 +38,7 @@ void QueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, s
 void QueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 void QueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 void QueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+void QueryInstruction::affectQuery(QueryState& q, PtrResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 
 void AQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){
 	
@@ -56,9 +57,9 @@ void AQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shar
 	}
 	
 	if(cont == QueryContext::additionalSection){
-		q.expandNextServerAnswer(recP);
 		q.expandNextServerIps(record.getName(), record.getDataAsString());
 	}
+	
 
 
 }
@@ -114,11 +115,7 @@ void NSQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record,
 
 void NSQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
 
-	
-	if(cont == QueryContext::answerSection){
-		q.expandIps(record.getDataAsString());
-	}
-	
+
 	if(cont == QueryContext::additionalSection){
 		q.expandNextServerIps(record.getName(), record.getDataAsString());
 	}
@@ -164,6 +161,7 @@ void AllQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, sh
 
 
 }
+
 void AllQueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
 
 	if(cont == QueryContext::authoritySection){
@@ -185,6 +183,42 @@ void AllQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, sha
 	}
 
 }
+
+void PtrQueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	if(cont == QueryContext::authoritySection){
+		q.expandNextServers(record.getDataAsString());
+	}
+
+}
+void PtrQueryInstruction::affectQuery(QueryState& q, ResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
+
+void PtrQueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){
+	
+	if(cont == QueryContext::answerSection){
+		q.expandInfo(recP);
+		q.redirectQuery(record.getDataAsString());
+	}
+
+}
+
+void PtrQueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ 
+
+	if(cont == QueryContext::additionalSection){
+		q.expandNextServerIps(record.getName(), record.getDataAsString());
+	}
+
+
+}
+
+void PtrQueryInstruction::affectQuery(QueryState& q, PtrResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){
+	
+	if(cont == QueryContext::answerSection){
+		q.expandAnswers(recP);
+	}
+
+}
+
 
 
 
@@ -294,6 +328,7 @@ QueryState::QueryState(string sname, QueryState* q): _sname(sname){
 	//since this is a follow up query, only care about this domain's address(for use in resolving the original query).
 	_stype = (uint16_t) ResourceTypes::a;
 	_sclass = (uint16_t) ResourceClasses::in;
+	_inst = make_shared<AQueryInstruction>();
 	
 	_numOpsLocalLeft.store(perQueryOpCap);
 	_ansMutex = make_shared<std::mutex>();
@@ -308,7 +343,7 @@ QueryState::QueryState(string sname, QueryState* q): _sname(sname){
 	_msgCode = (uint8_t) ResponseCodes::none;
 	_startTime = time(NULL);
 	_id = pickNextId();
-	_inst = q->_inst;
+	
 }
 
 //expects a file path, with each line of that file being a root entry. Format of each line is ip;domain name
