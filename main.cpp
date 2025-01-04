@@ -10,6 +10,8 @@
 
 using namespace std;
 
+vector<thread> threads;
+
 const string domainCommand = "-domain";
 const string typeCommand = "-type";
 const string helpCommand = "-help";
@@ -126,7 +128,7 @@ shared_ptr<QueryState> buildQuery(string domain, string type, bool& success){
 		return make_shared<QueryState>(domain, (uint16_t)ResourceTypes::cname, (uint16_t)ResourceClasses::in, qi);
 	
 	}
-	else if(type == "NS"){
+	else if(type == "Ns"){
 		success = true;
 		shared_ptr<QueryInstruction> qi = make_shared<NSQueryInstruction>();
 		return make_shared<QueryState>(domain, (uint16_t)ResourceTypes::ns, (uint16_t)ResourceClasses::in, qi);
@@ -154,6 +156,8 @@ shared_ptr<QueryState> buildQuery(string domain, string type, bool& success){
 }
 
 
+
+
 void makeQuery(string domain, string type){
 
 	loadSafeties("./safety.txt");
@@ -162,39 +166,8 @@ void makeQuery(string domain, string type){
 	shared_ptr<QueryState> q = buildQuery(domain,type,success);
 	if(!success) return;
 	
-	moreThreads.store(true);
-	QueryState::solveStandardQuery(q);
-	q->displayResult();
-	moreThreads.store(false);
+	threads.emplace_back(QueryState::startThreadFunction, q);
 	
-	
-	while(true){
-	
-		threadMutex.lock();
-		if(threads.size() < 1){
-			threadMutex.unlock();
-			break;
-		}
-		else{
-			thread& t = threads.back();
-			if(t.joinable()){
-				threadMutex.unlock();
-				t.join();
-			}
-			else{
-				threadMutex.unlock();
-				threads.pop_back();
-			
-			}
-			
-		
-		}
-	
-
-	}
-	
-	dumpCacheToFile();
-
 }
 
 
@@ -245,6 +218,15 @@ int main(int argc, char** argv){
 		}
 			
 	}
+	
+	
+	for(auto iter = threads.begin(); iter < threads.end(); iter++){
+	
+		iter->join();
+	}
+	
+	
+	dumpCacheToFile();
 	
 
 	return 0;

@@ -37,12 +37,12 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	serverAddr.sin_port = htons(serverPort);
 	int success = inet_aton(ipStr, &(serverAddr.sin_addr));
 	if(success == 0){
-		cout << "invalid ip conversion" << endl;
+		perror("invalid ip\n");
 		return (int)NetworkErrors::user;
 	}
 	
 	if(msg.empty()){
-		cout << "need a message to send" << endl;
+		perror("need message to send\n");
 		return (int)NetworkErrors::user;
 	}
 	
@@ -54,7 +54,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 	
 	if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0){
-		cout << "failed to connect" << endl;
+		perror("failed to connect\n");
 		return (int)NetworkErrors::socket;
 	}
 	
@@ -72,7 +72,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	int bytesRec = recv(clientSocket, buffer, sizeof(buffer), 0);
 	
 	if(bytesRec < 1){
-		cout << "failed to read message from server" << endl;
+		perror("failed to read message from server\n");
 		close(clientSocket);
 		return (int)NetworkErrors::recieving;
 	}

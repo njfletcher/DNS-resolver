@@ -31,12 +31,6 @@ extern std::mutex cacheMutex;
 extern std::unordered_map<std::string, std::vector< std::shared_ptr<ResourceRecord> > > cache;
 extern std::mutex printMutex;
 
-extern std::vector<std::thread> threads;
-extern std::mutex threadMutex;
-
-extern std::atomic<bool> moreThreads;
-
-
 
 enum class qrVals{
 
@@ -192,7 +186,8 @@ class QueryState{
 		void setMatchScore(std::string domainName);
 		static void solveStandardQuery(std::shared_ptr<QueryState> q);
 		static void sendStandardQuery(std::shared_ptr<QueryState> q, std::string nameServerIp);
-		static void threadFunction(std::shared_ptr<QueryState> currS, std::shared_ptr<QueryState> query);
+		static void workThreadFunction(std::shared_ptr<QueryState> currS, std::shared_ptr<QueryState> query);
+		static void startThreadFunction(std::shared_ptr<QueryState> q);
 		
 		bool checkEndCondition();
 		void displayResult();
@@ -207,6 +202,10 @@ class QueryState{
 		std::shared_ptr<QueryInstruction> _inst;
 		
 	private:
+		
+		std::shared_ptr<std::atomic<bool> > _moreThreads;
+		std::shared_ptr<std::vector<std::thread> > _threads;
+		std::shared_ptr<std::mutex> _threadMutex;
 		
 		//name queried
 		std::string _sname;

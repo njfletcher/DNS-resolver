@@ -25,14 +25,7 @@ vector<uint16_t> takenIds;
 
 mutex cacheMutex;
 unordered_map<string, vector< shared_ptr<ResourceRecord> > > cache;
-
 mutex printMutex;
-
-vector<thread> threads;
-mutex threadMutex;
-
-atomic<bool> moreThreads(true);
-
 
 void QueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 void QueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
@@ -220,9 +213,6 @@ void PtrQueryInstruction::affectQuery(QueryState& q, PtrResourceRecord& record, 
 }
 
 
-
-
-
 void dumpCacheToFile(){
 
 	ofstream ot("cacheDump.txt");
@@ -286,7 +276,7 @@ void reclaimId(uint16_t id){
 QueryState::~QueryState(){
 
 	reclaimId(_id);
-
+	
 }
 
 void QueryState::redirectQuery(std::string sname){
@@ -294,11 +284,13 @@ void QueryState::redirectQuery(std::string sname){
 	_sname = sname;
 	_redirected.store(true);
 	_servMutex->lock();
+	
 	for(auto iter = _nextServers.begin(); iter < _nextServers.end(); iter++){
 		shared_ptr<QueryState> q = *iter;
 		q->forceEndQuery(true);
 	}
 	_nextServers.clear();
+	
 	_servMutex->unlock();
 }
 
@@ -308,7 +300,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, shared_ptr
 	_redirected.store(false);
 	_id = pickNextId();
 	_matchScore = 0;
-	
+		
 	_startTime = time(NULL);
 	
 	_networkCode = (int) NetworkErrors::none;
@@ -317,9 +309,13 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, shared_ptr
 	_numOpsLocalLeft.store(perSequenceOpCap);
 	_numOpsGlobalLeft = make_shared<atomic<int> >(perSequenceOpCap);
 	
+	_moreThreads = make_shared<atomic<bool> >(true);
+	_threads = make_shared<vector<thread> >(true);
+	
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
 	_infoMutex = make_shared<std::mutex>();
+	_threadMutex = make_shared<std::mutex>();
 	
 }
 
@@ -329,11 +325,15 @@ QueryState::QueryState(string sname, QueryState* q): _sname(sname){
 	_stype = (uint16_t) ResourceTypes::a;
 	_sclass = (uint16_t) ResourceClasses::in;
 	_inst = make_shared<AQueryInstruction>();
-	
+		
 	_numOpsLocalLeft.store(perQueryOpCap);
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
 	_infoMutex = make_shared<std::mutex>();
+	
+	_moreThreads = q->_moreThreads;
+	_threads = q->_threads;
+	_threadMutex = q->_threadMutex;
 	
 	 _numOpsGlobalLeft = q->_numOpsGlobalLeft;
 	
@@ -708,7 +708,7 @@ void QueryState::setMatchScore(string domainName){
 }
 
 
-void QueryState::threadFunction(shared_ptr<QueryState> currS, shared_ptr<QueryState> query){
+void QueryState::workThreadFunction(shared_ptr<QueryState> currS, shared_ptr<QueryState> query){
 
 	query->decrementOps();
 	currS->_ansMutex->lock();
@@ -732,11 +732,25 @@ void QueryState::threadFunction(shared_ptr<QueryState> currS, shared_ptr<QuerySt
 					
 }
 
+void QueryState::startThreadFunction(shared_ptr<QueryState> q){
+
+	QueryState::solveStandardQuery(q);
+	q->displayResult();
+	q->_moreThreads->store(false);
+	
+	q->_threadMutex->lock();
+	for(auto iter = q->_threads->begin(); iter < q->_threads->end(); iter++){
+	
+		if(iter->joinable()) iter->join();
+		
+	}
+	q->_threadMutex->unlock();
+
+	
+}
+
 void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 
-	//printMutex.lock();
-	//cout << "started resolving " << _sname << endl;
-	//printMutex.unlock();
 	
 	q->_beingUsed.store(true);
 
@@ -809,12 +823,11 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 			solveStandardQuery(q);
 		}
 		
-		if(q->checkEndCondition()) break;
-		if(!moreThreads.load()) break;
+		if(q->checkEndCondition()){
+			//q->forceEndQuery(true);
+			break;
+		}
 		
-		
-		
-	
 		vector<shared_ptr<QueryState> > nextServers;
 	
 		q->_servMutex->lock();
@@ -832,10 +845,10 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 			
 			shared_ptr<QueryState> currS = *iter;
 			
-			if(q->haveLocalOpsLeft() && q->haveGlobalOpsLeft() && moreThreads.load()){
-				threadMutex.lock();
-				threads.emplace_back(threadFunction, currS, q);
-				threadMutex.unlock();
+			if(q->haveLocalOpsLeft() && q->haveGlobalOpsLeft() && q->_moreThreads->load()){
+				q->_threadMutex->lock();
+				q->_threads->emplace_back(workThreadFunction, currS, q);
+				q->_threadMutex->unlock();
 			}
 				
 			
