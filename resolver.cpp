@@ -315,7 +315,7 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, shared_ptr
 	_parentShutdown = make_shared<atomic<bool> >(false);
 	_shutdown = make_shared<atomic<bool> >(false);
 	
-	_threads = make_shared<vector<thread> >(true);
+	_threads = make_shared<vector<thread> >();
 	
 	_ansMutex = make_shared<std::mutex>();
 	_servMutex = make_shared<std::mutex>();
@@ -755,30 +755,17 @@ void QueryState::startThreadFunction(shared_ptr<QueryState> q){
 	QueryState::solveStandardQuery(q);
 	q->displayResult();
 	
-		
-	while(true){
 	
-		q->_threadMutex->lock();
-		if(q->_threads->size() < 1){
-			q->_threadMutex->unlock();
-			break;
-		}
-		else{
-			thread& t = q->_threads->back();
-			if(t.joinable()){
-				q->_threadMutex->unlock();
-				t.join();
-			}
-			else{
-				q->_threads->pop_back();
-				q->_threadMutex->unlock();
-			}
-			
-		
-		}
 	
+	q->_threadMutex->lock();
+	q->forceEndQuery(false);
+	for(auto iter = q->_threads->begin(); iter < q->_threads->end(); iter++){
+	
+		if(iter->joinable()) iter->join();
+		
 	}
-	
+	q->_threadMutex->unlock();
+
 	
 }
 
@@ -879,6 +866,7 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 			shared_ptr<QueryState> currS = *iter;
 			
 			if(q->haveLocalOpsLeft() && q->haveGlobalOpsLeft() && !q->_shutdown->load() && !q->_parentShutdown->load()){
+			
 				q->_threadMutex->lock();
 				q->_threads->emplace_back(workThreadFunction, currS, q);
 				q->_threadMutex->unlock();

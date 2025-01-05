@@ -178,6 +178,8 @@ int main(int argc, char** argv){
 	bool running = true;
 	string command = "";
 	
+	//makeQuery("5.3.101.151.IN-ADDR.ARPA", "Ptr");
+	
 	while(running){
 	
 		getline(cin,command);
@@ -223,6 +225,7 @@ int main(int argc, char** argv){
 	
 		iter->join();
 	}
+	
 	
 	
 	dumpCacheToFile();
