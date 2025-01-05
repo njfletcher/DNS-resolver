@@ -203,7 +203,9 @@ class QueryState{
 		
 	private:
 		
-		std::shared_ptr<std::atomic<bool> > _moreThreads;
+		std::shared_ptr<std::atomic<bool> > _parentShutdown;
+		std::shared_ptr<std::atomic<bool> > _shutdown;
+		
 		std::shared_ptr<std::vector<std::thread> > _threads;
 		std::shared_ptr<std::mutex> _threadMutex;
 		

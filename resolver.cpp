@@ -309,7 +309,9 @@ QueryState::QueryState(string sname, uint16_t stype, uint16_t sclass, shared_ptr
 	_numOpsLocalLeft.store(perSequenceOpCap);
 	_numOpsGlobalLeft = make_shared<atomic<int> >(perSequenceOpCap);
 	
-	_moreThreads = make_shared<atomic<bool> >(true);
+	_parentShutdown = make_shared<atomic<bool> >(false);
+	_shutdown = make_shared<atomic<bool> >(false);
+	
 	_threads = make_shared<vector<thread> >(true);
 	
 	_ansMutex = make_shared<std::mutex>();
@@ -331,7 +333,9 @@ QueryState::QueryState(string sname, QueryState* q): _sname(sname){
 	_servMutex = make_shared<std::mutex>();
 	_infoMutex = make_shared<std::mutex>();
 	
-	_moreThreads = q->_moreThreads;
+	_parentShutdown = q->_parentShutdown;
+	_shutdown = make_shared<atomic<bool> >(false);
+	
 	_threads = q->_threads;
 	_threadMutex = q->_threadMutex;
 	
@@ -509,10 +513,10 @@ bool QueryState::haveGlobalOpsLeft(){
 
 void QueryState::forceEndQuery(bool localOnly){
 
-	_numOpsLocalLeft.store(0);
+	_shutdown->store(true);
 
 	if(!localOnly){
-		_numOpsGlobalLeft->store(0);
+		_parentShutdown->store(true);
 	}
 
 }
@@ -580,6 +584,10 @@ void splitDomainName(string domainName, vector<string>& splits, bool rev){
 bool QueryState::checkEndCondition(){
 
 	bool end = false;
+	
+	if(!_parentShutdown->load()) end = true;
+	
+	if(!_shutdown->load()) end = true;
 	
 	if(!haveGlobalOpsLeft()) end = true;
 	
@@ -674,6 +682,10 @@ void QueryState::displayResult(){
 	
 	if(allServersDone) cout << " all servers depleted " << endl;
 	
+	if(!_parentShutdown->load()) cout << " global shutdown " << endl;
+	
+	if(!_shutdown->load()) cout << " local shutdown " << endl;
+	
 	printMutex.unlock();
 	
 }
@@ -736,7 +748,32 @@ void QueryState::startThreadFunction(shared_ptr<QueryState> q){
 
 	QueryState::solveStandardQuery(q);
 	q->displayResult();
-	q->_moreThreads->store(false);
+	q->forceEndQuery(true);
+	
+		
+	/*while(true){
+	
+		q->_threadMutex->lock();
+		if(q->_threads->size() < 1){
+			q->_threadMutex->unlock();
+			break;
+		}
+		else{
+			thread& t = q->_threads->back();
+			if(t.joinable()){
+				q->_threadMutex->unlock();
+				t.join();
+			}
+			else{
+				q->_threads->pop_back();
+				q->_threadMutex->unlock();
+			}
+			
+		
+		}
+	
+	}
+	*/
 	
 	q->_threadMutex->lock();
 	for(auto iter = q->_threads->begin(); iter < q->_threads->end(); iter++){
