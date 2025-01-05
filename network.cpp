@@ -27,7 +27,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 
 	if(clientSocket < 0){
-		perror("cant create socket\n");
+		//perror("cant create socket\n");
 		return (int)NetworkErrors::socket;
 	
 	}
@@ -37,12 +37,12 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	serverAddr.sin_port = htons(serverPort);
 	int success = inet_aton(ipStr, &(serverAddr.sin_addr));
 	if(success == 0){
-		perror("invalid ip\n");
+		//perror("invalid ip\n");
 		return (int)NetworkErrors::user;
 	}
 	
 	if(msg.empty()){
-		perror("need message to send\n");
+		//perror("need message to send\n");
 		return (int)NetworkErrors::user;
 	}
 	
@@ -54,14 +54,14 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	
 	
 	if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0){
-		perror("failed to connect\n");
+		//perror("failed to connect\n");
 		return (int)NetworkErrors::socket;
 	}
 	
 	int bytesSent = send(clientSocket, msgArr, sz, 0);
 	
 	if(bytesSent < 1){
-		perror("cant send message\n");
+		//perror("cant send message\n");
 		close(clientSocket);
 		return (int)NetworkErrors::sending;
 	
@@ -72,7 +72,7 @@ int sendMessageResolverClient(string serverIp, vector<uint8_t>& msg, vector<uint
 	int bytesRec = recv(clientSocket, buffer, sizeof(buffer), 0);
 	
 	if(bytesRec < 1){
-		perror("failed to read message from server\n");
+		//perror("failed to read message from server\n");
 		close(clientSocket);
 		return (int)NetworkErrors::recieving;
 	}

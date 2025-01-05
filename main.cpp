@@ -180,7 +180,6 @@ int main(int argc, char** argv){
 	
 	while(running){
 	
-		cout << "Please enter a command: ";
 		getline(cin,command);
 		if(command == ""){
 			cout << "Entered an empty command. Use the " + helpCommand + " command for information about this program.";

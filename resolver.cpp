@@ -824,7 +824,6 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 		}
 		
 		if(q->checkEndCondition()){
-			//q->forceEndQuery(true);
 			break;
 		}
 		
