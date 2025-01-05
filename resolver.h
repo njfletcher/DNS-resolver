@@ -14,11 +14,6 @@
 
 #define maxDomainNameLen 255
 
-//operation capping to make sure threads dont go out of control or network errors cause program to run forever.
-//a thread spawn or network request is one operation decrement
-#define perQueryOpCap 50
-#define perSequenceOpCap 1000
-
 class DNSMessage;
 class ResourceRecord;
 class AResourceRecord;

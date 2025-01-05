@@ -27,6 +27,9 @@ mutex cacheMutex;
 unordered_map<string, vector< shared_ptr<ResourceRecord> > > cache;
 mutex printMutex;
 
+int perQueryOpCap = 50;
+int perSequenceOpCap = 1000;
+
 void QueryInstruction::affectQuery(QueryState& q, CNameResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 void QueryInstruction::affectQuery(QueryState& q, AResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
 void QueryInstruction::affectQuery(QueryState& q, NSResourceRecord& record, shared_ptr<ResourceRecord> recP, QueryContext cont){ return; }
@@ -585,9 +588,12 @@ bool QueryState::checkEndCondition(){
 
 	bool end = false;
 	
-	if(!_parentShutdown->load()) end = true;
+	if(_parentShutdown->load()){
+		end = true;
+		_shutdown->store(true);	
+	}
 	
-	if(!_shutdown->load()) end = true;
+	if(_shutdown->load()) end = true;
 	
 	if(!haveGlobalOpsLeft()) end = true;
 	
@@ -603,7 +609,7 @@ bool QueryState::checkEndCondition(){
 	bool allServersDone = true;
 	for(auto iter = _nextServers.begin(); iter < _nextServers.end(); iter++){
 		shared_ptr<QueryState> qr = *iter;
-		if(qr->haveLocalOpsLeft()){
+		if(!qr->_shutdown->load()){
 			allServersDone = false;
 			break;
 		}
@@ -673,7 +679,7 @@ void QueryState::displayResult(){
 	bool allServersDone = true;
 	for(auto iter = _nextServers.begin(); iter < _nextServers.end(); iter++){
 		shared_ptr<QueryState> qr = *iter;
-		if(qr->haveLocalOpsLeft()){
+		if(!qr->_shutdown->load()){
 			allServersDone = false;
 			break;
 		}
@@ -748,10 +754,9 @@ void QueryState::startThreadFunction(shared_ptr<QueryState> q){
 
 	QueryState::solveStandardQuery(q);
 	q->displayResult();
-	q->forceEndQuery(true);
 	
 		
-	/*while(true){
+	while(true){
 	
 		q->_threadMutex->lock();
 		if(q->_threads->size() < 1){
@@ -773,16 +778,7 @@ void QueryState::startThreadFunction(shared_ptr<QueryState> q){
 		}
 	
 	}
-	*/
 	
-	q->_threadMutex->lock();
-	for(auto iter = q->_threads->begin(); iter < q->_threads->end(); iter++){
-	
-		if(iter->joinable()) iter->join();
-		
-	}
-	q->_threadMutex->unlock();
-
 	
 }
 
@@ -861,6 +857,7 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 		}
 		
 		if(q->checkEndCondition()){
+			q->forceEndQuery(true);
 			break;
 		}
 		
@@ -881,7 +878,7 @@ void QueryState::solveStandardQuery(shared_ptr<QueryState> q){
 			
 			shared_ptr<QueryState> currS = *iter;
 			
-			if(q->haveLocalOpsLeft() && q->haveGlobalOpsLeft() && q->_moreThreads->load()){
+			if(q->haveLocalOpsLeft() && q->haveGlobalOpsLeft() && !q->_shutdown->load() && !q->_parentShutdown->load()){
 				q->_threadMutex->lock();
 				q->_threads->emplace_back(workThreadFunction, currS, q);
 				q->_threadMutex->unlock();
