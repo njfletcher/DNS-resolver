@@ -58,6 +58,7 @@ enum class ResourceTypes{
 	minfo = 14, //mailbox or mail list information
 	mx = 15, //mail exchange
 	txt = 16, //text strings
+	aaaa = 28,
 	afxr = 252, // a request for a transfer of an entire zone
 	mailb = 253,//a request for mailbox related records( MB, MG, or MR)
 	all = 255// a request for all records(*)

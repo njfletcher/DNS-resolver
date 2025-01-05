@@ -165,6 +165,18 @@ class AResourceRecord: public ResourceRecord {
 		uint32_t _ip;
 };
 
+class AAAAResourceRecord: public ResourceRecord {
+	public:
+		~AAAAResourceRecord() = default;
+		std::string getDataAsString();
+		void convertRData();
+		AAAAResourceRecord(const std::vector<uint8_t>::iterator start, std::vector<uint8_t>::iterator & iter, const std::vector<uint8_t>::iterator end, bool& succeeded);
+		void executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query);
+		
+	private:
+		unsigned char _ip[16];
+};
+
 class CNameResourceRecord: public ResourceRecord{
 
 	public:

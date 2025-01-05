@@ -604,6 +604,13 @@ void AResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, Q
 	query._inst->affectQuery(query, *this, rec, cont);
 
 }
+
+void AAAAResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
+
+	query._inst->affectQuery(query, *this, rec, cont);
+
+}
+
 void NSResourceRecord::executeInstructions(std::shared_ptr<ResourceRecord> rec, QueryContext cont, QueryState& query){
 
 	query._inst->affectQuery(query, *this, rec, cont);
@@ -772,13 +779,32 @@ vector<shared_ptr<ResourceRecord> >* ResourceRecord::getRecordsFromCache(string 
 
 }
 
-string convertIpIntToString(uint32_t ip){
+string convertIp4ToString(uint32_t ip){
 
 	char buffer[INET_ADDRSTRLEN];
 	struct in_addr a;
 	a.s_addr = ip;
 	
 	inet_ntop(AF_INET, &a, buffer, INET_ADDRSTRLEN);
+	
+	string s = string(buffer);
+	
+	return s;
+
+}
+
+string convertIp6ToString(unsigned char* ip){
+
+	char buffer[INET6_ADDRSTRLEN];
+	
+	struct in6_addr a;
+	
+	for(int i = 0; i < 16; i++){
+	
+		a.s6_addr[i] = ip[i];
+	}
+	
+	inet_ntop(AF_INET6, &a, buffer, INET6_ADDRSTRLEN);
 	
 	string s = string(buffer);
 	
@@ -814,6 +840,8 @@ shared_ptr<ResourceRecord> ResourceRecord::GetSpecialResourceRecord(const vector
 			return make_shared<CNameResourceRecord>(start,iter,end,succeeded);
 		case (uint16_t) ResourceTypes::ptr:
 			return make_shared<PtrResourceRecord>(start,iter,end,succeeded);
+		case (uint16_t) ResourceTypes::aaaa:
+			return make_shared<AAAAResourceRecord>(start,iter,end,succeeded);
 		default:
 			return make_shared<ResourceRecord>(start,iter,end,succeeded);
 
@@ -1049,7 +1077,30 @@ void AResourceRecord::convertRData(){
 
 string AResourceRecord::getDataAsString(){
 
-	return convertIpIntToString(_ip);
+	return convertIp4ToString(_ip);
+}
+
+AAAAResourceRecord::AAAAResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end,succeeded), _ip{0}{
+	convertRData();
+}
+
+void AAAAResourceRecord::convertRData(){
+
+	if(_rData.size() >= 16){
+	
+		for(int i = 0; i < 16; i++){
+			
+			_ip[i] = _rData[i];
+		
+		}
+	}
+
+}
+
+
+string AAAAResourceRecord::getDataAsString(){
+
+	return convertIp6ToString(_ip);
 }
 
 NSResourceRecord::NSResourceRecord(const vector<uint8_t>::iterator start, vector<uint8_t>::iterator & iter, const vector<uint8_t>::iterator end, bool& succeeded) : ResourceRecord(start, iter,end, succeeded) {
